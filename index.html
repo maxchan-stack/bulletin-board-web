@@ -740,13 +740,31 @@ async function fetchConfigPin() {
   if (!match) throw new Error('無法解析 config 工作表');
   const data = JSON.parse(match[1]);
   const rows = data.table?.rows || [];
+
+  // 1. 標準做法：尋找第一欄為 'pin' 的那一列，取第二欄的值
   for (const row of rows) {
     const cells = row.c || [];
-    const key = cells[0]?.v;
-    const val = cells[1]?.v;
-    if (key === 'pin') return String(val ?? '');
+    if (cells[0]?.v && String(cells[0].v).toLowerCase().trim() === 'pin') {
+      return String(cells[1]?.v ?? '').trim();
+    }
   }
-  throw new Error('config 工作表中找不到 pin 設定');
+
+  // 2. 容錯備份一：如果使用者直接把 PIN 碼打在 A1 儲存格（或者整個工作表的第一格）
+  if (rows.length > 0) {
+    const firstRowCells = rows[0]?.c || [];
+    const val1 = firstRowCells[0]?.v;
+    if (val1 !== null && val1 !== undefined && val1 !== '') {
+      return String(val1).trim();
+    }
+  }
+
+  // 3. 容錯備份二：如果 Google 試算表將第一列當作標頭（header），而 A1 就是密碼
+  const cols = data.table?.cols || [];
+  if (cols[0]?.label && cols[0].label !== 'key') {
+    return String(cols[0].label).trim();
+  }
+
+  throw new Error('config 工作表無任何設定值');
 }
 
 function proceedFromRole() {
