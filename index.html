@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
   <title>高二甲班電子佈告欄</title>
-  <meta name="description" content="高二甲班作業、小考、交代事項查詢平台">
+  <meta name="description" content="高二甲班作業、小考、老師交代事項、學校行政公告查詢平台">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;500;700&family=Noto+Sans+TC:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -30,6 +30,8 @@
       --c-quiz-dim:     rgba(181,112,90,0.09);
       --c-note:         #6A9E7C;
       --c-note-dim:     rgba(106,158,124,0.09);
+      --c-admin:        #8A738F;
+      --c-admin-dim:    rgba(138,115,143,0.09);
       --c-danger:       #B5705A;
       --c-success:      #6A9E7C;
       --c-warn:         #B89A4A;
@@ -194,6 +196,7 @@
     .filter-chip.active-hw   { background: var(--c-hw-dim);   border-color: rgba(91,127,168,0.3);   color: var(--c-hw); }
     .filter-chip.active-quiz { background: var(--c-quiz-dim); border-color: rgba(181,112,90,0.3);   color: var(--c-quiz); }
     .filter-chip.active-note { background: var(--c-note-dim); border-color: rgba(106,158,124,0.3);  color: var(--c-note); }
+    .filter-chip.active-admin { background: var(--c-admin-dim); border-color: rgba(138,115,143,0.3);  color: var(--c-admin); }
 
     /* 公告卡片 */
     .cards-grid { display: flex; flex-direction: column; gap: 1px; }
@@ -213,6 +216,7 @@
     .accent-hw   { background: var(--c-hw); }
     .accent-quiz { background: var(--c-quiz); }
     .accent-note { background: var(--c-note); }
+    .accent-admin { background: var(--c-admin); }
 
     .card-body { flex: 1; min-width: 0; }
     .card-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
@@ -220,6 +224,7 @@
     .tag-hw   { background: var(--c-hw-dim);   color: var(--c-hw); }
     .tag-quiz { background: var(--c-quiz-dim); color: var(--c-quiz); }
     .tag-note { background: var(--c-note-dim); color: var(--c-note); }
+    .tag-admin { background: var(--c-admin-dim); color: var(--c-admin); }
     .subject-tag { font-size: 0.73rem; font-weight: 400; color: var(--c-text-muted); background: var(--c-surface-2); padding: 2px 9px; border-radius: 2px; border: 1px solid var(--c-border); }
     .card-content { font-size: 0.88rem; color: var(--c-text); line-height: 1.75; margin-bottom: 10px; white-space: pre-wrap; word-break: break-word; }
     .card-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px; }
@@ -368,7 +373,7 @@
       <div class="role-card" id="role-card-viewer" onclick="selectRoleCard('viewer')">
         <span class="role-card-icon">📖</span>
         <div class="role-card-name">學生 / 家長</div>
-        <div class="role-card-desc">瀏覽作業、小考與交代事項</div>
+        <div class="role-card-desc">瀏覽作業、小考、老師交代事項與學校行政公告</div>
       </div>
       <div class="role-card" id="role-card-cadre" onclick="selectRoleCard('cadre')">
         <span class="role-card-icon">💼</span>
@@ -427,17 +432,19 @@
     </div>
 
     <!-- 統計資訊面版 (僅管理員可見) -->
-    <div id="admin-stats-box" class="hidden" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; background: rgba(92,77,67,0.05); border: 1.5px solid var(--c-border); border-radius: var(--radius-md); padding: 12px 16px;">
+    <div id="admin-stats-box" class="hidden" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; background: rgba(92,77,67,0.05); border: 1.5px solid var(--c-border); border-radius: var(--radius-md); padding: 12px 16px;">
       <div style="text-align: center;"><div style="font-size: 0.75rem; color: var(--c-text-muted); font-weight: 500;">作業總數</div><div id="stat-hw" style="font-size: 1.3rem; font-weight: 600; color: var(--c-hw);">0</div></div>
-      <div style="text-align: center; border-left: 1px solid var(--c-border); border-right: 1px solid var(--c-border);"><div style="font-size: 0.75rem; color: var(--c-text-muted); font-weight: 500;">小考總數</div><div id="stat-quiz" style="font-size: 1.3rem; font-weight: 600; color: var(--c-quiz);">0</div></div>
-      <div style="text-align: center;"><div style="font-size: 0.75rem; color: var(--c-text-muted); font-weight: 500;">交代事項</div><div id="stat-note" style="font-size: 1.3rem; font-weight: 600; color: var(--c-note);">0</div></div>
+      <div style="text-align: center; border-left: 1px solid var(--c-border);"><div style="font-size: 0.75rem; color: var(--c-text-muted); font-weight: 500;">小考總數</div><div id="stat-quiz" style="font-size: 1.3rem; font-weight: 600; color: var(--c-quiz);">0</div></div>
+      <div style="text-align: center; border-left: 1px solid var(--c-border); border-right: 1px solid var(--c-border);"><div style="font-size: 0.75rem; color: var(--c-text-muted); font-weight: 500;">老師交代</div><div id="stat-note" style="font-size: 1.3rem; font-weight: 600; color: var(--c-note);">0</div></div>
+      <div style="text-align: center;"><div style="font-size: 0.75rem; color: var(--c-text-muted); font-weight: 500;">行政公告</div><div id="stat-admin" style="font-size: 1.3rem; font-weight: 600; color: var(--c-admin);">0</div></div>
     </div>
 
     <div class="filter-bar">
       <div class="filter-chip active-all" data-filter="all" onclick="setFilter('all')">全部</div>
       <div class="filter-chip" data-filter="作業" onclick="setFilter('作業')">作業</div>
       <div class="filter-chip" data-filter="小考" onclick="setFilter('小考')">小考</div>
-      <div class="filter-chip" data-filter="交代事項" onclick="setFilter('交代事項')">交代事項</div>
+      <div class="filter-chip" data-filter="老師交代事項" onclick="setFilter('老師交代事項')">老師交代事項</div>
+      <div class="filter-chip" data-filter="學校行政公告" onclick="setFilter('學校行政公告')">學校行政公告</div>
     </div>
 
     <div id="bulletin-list"></div>
@@ -467,7 +474,8 @@
               <option value="">— 請選擇 —</option>
               <option value="作業">作業</option>
               <option value="小考">小考</option>
-              <option value="交代事項">交代事項</option>
+              <option value="老師交代事項">老師交代事項</option>
+              <option value="學校行政公告">學校行政公告</option>
             </select>
           </div>
           <div class="form-group">
@@ -900,10 +908,16 @@ function setFilter(filter) {
       if (filter === 'all') el.classList.add('active-all');
       else if (filter === '作業') el.classList.add('active-hw');
       else if (filter === '小考') el.classList.add('active-quiz');
+      else if (filter === '學校行政公告') el.classList.add('active-admin');
       else el.classList.add('active-note');
     }
   });
-  const filtered = filter === 'all' ? APP.allBulletins : APP.allBulletins.filter(b => b.category === filter);
+  const filtered = filter === 'all'
+    ? APP.allBulletins
+    : APP.allBulletins.filter(b => {
+        if (filter === '老師交代事項') return b.category === '老師交代事項' || b.category === '交代事項';
+        return b.category === filter;
+      });
   renderBulletinList(filtered);
 }
 
@@ -918,7 +932,12 @@ function renderBulletins(bulletins) {
     const statsBox = document.getElementById('admin-stats-box');
     if (statsBox) statsBox.classList.add('hidden');
   }
-  const filtered = APP.activeFilter === 'all' ? bulletins : bulletins.filter(b => b.category === APP.activeFilter);
+  const filtered = APP.activeFilter === 'all'
+    ? bulletins
+    : bulletins.filter(b => {
+        if (APP.activeFilter === '老師交代事項') return b.category === '老師交代事項' || b.category === '交代事項';
+        return b.category === APP.activeFilter;
+      });
   renderBulletinList(filtered);
 }
 
@@ -926,16 +945,20 @@ function calculateStats(bulletins) {
   let hwCount = 0;
   let quizCount = 0;
   let noteCount = 0;
+  let adminCount = 0;
 
   bulletins.forEach(b => {
     if (b.category === '作業') hwCount++;
     else if (b.category === '小考') quizCount++;
-    else if (b.category === '交代事項') noteCount++;
+    else if (b.category === '老師交代事項' || b.category === '交代事項') noteCount++;
+    else if (b.category === '學校行政公告') adminCount++;
   });
 
   document.getElementById('stat-hw').textContent = hwCount;
   document.getElementById('stat-quiz').textContent = quizCount;
   document.getElementById('stat-note').textContent = noteCount;
+  const statAdmin = document.getElementById('stat-admin');
+  if (statAdmin) statAdmin.textContent = adminCount;
 }
 
 function renderBulletinList(list) {
@@ -953,7 +976,13 @@ function renderBulletinList(list) {
   grid.className = 'cards-grid';
 
   list.forEach(b => {
-    const catMap = { '作業': ['hw','tag-hw'], '小考': ['quiz','tag-quiz'], '交代事項': ['note','tag-note'] };
+    const catMap = { 
+      '作業': ['hw','tag-hw'], 
+      '小考': ['quiz','tag-quiz'], 
+      '交代事項': ['note','tag-note'],
+      '老師交代事項': ['note','tag-note'],
+      '學校行政公告': ['admin','tag-admin']
+    };
     const [accentKey, tagClass] = catMap[b.category] || ['note','tag-note'];
 
     let daysHTML = '';
