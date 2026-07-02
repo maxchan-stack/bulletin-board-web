@@ -128,7 +128,7 @@
     .role-header h1 { font-family: 'Noto Serif TC', serif; font-size: 1.75rem; font-weight: 500; color: var(--c-text); letter-spacing: 0.05em; line-height: 1.35; margin-bottom: 10px; }
     .role-header p { font-size: 0.87rem; color: var(--c-text-muted); line-height: 1.8; }
 
-    .role-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+    .role-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px; margin-bottom: 24px; }
     .role-card {
       background: var(--c-surface); border: 1.5px solid var(--c-border);
       border-radius: var(--radius-lg); padding: 28px 20px;
@@ -366,10 +366,15 @@
         <div class="role-card-name">學生 / 家長</div>
         <div class="role-card-desc">瀏覽作業、小考與交代事項</div>
       </div>
-      <div class="role-card" id="role-card-editor" onclick="selectRoleCard('editor')">
-        <span class="role-card-icon">✏️</span>
-        <div class="role-card-name">幹部 / 小老師</div>
-        <div class="role-card-desc">輸入授權碼後發布公告</div>
+      <div class="role-card" id="role-card-cadre" onclick="selectRoleCard('cadre')">
+        <span class="role-card-icon">💼</span>
+        <div class="role-card-name">班級幹部</div>
+        <div class="role-card-desc">班長、股長發布班級公告</div>
+      </div>
+      <div class="role-card" id="role-card-teacher" onclick="selectRoleCard('teacher')">
+        <span class="role-card-icon">🎓</span>
+        <div class="role-card-name">學科小老師</div>
+        <div class="role-card-desc">發布各科作業與小考公告</div>
       </div>
     </div>
 
@@ -613,7 +618,10 @@ function goToRolePage() {
 
 function resetRolePage() {
   document.getElementById('role-card-viewer').classList.remove('selected');
-  document.getElementById('role-card-editor').classList.remove('selected');
+  const cadreCard = document.getElementById('role-card-cadre');
+  const teacherCard = document.getElementById('role-card-teacher');
+  if (cadreCard) cadreCard.classList.remove('selected');
+  if (teacherCard) teacherCard.classList.remove('selected');
   document.getElementById('role-sub-cadre').classList.add('hidden');
   document.getElementById('role-sub-teacher').classList.add('hidden');
   document.getElementById('role-pin-wrap').classList.add('hidden');
@@ -631,7 +639,7 @@ function updateHeader() {
     badge.classList.add('badge-editor');
     badge.textContent = '發布者';
   } else {
-    badge.classList.add('badge-viewer');
+    badge.className = 'header-role-badge badge-viewer';
     badge.textContent = '瀏覽';
   }
 }
@@ -641,8 +649,14 @@ function updateHeader() {
 // ═══════════════════════════════════════════════════════
 function selectRoleCard(type) {
   document.getElementById('role-card-viewer').classList.remove('selected');
-  document.getElementById('role-card-editor').classList.remove('selected');
-  document.getElementById('role-card-' + type).classList.add('selected');
+  const cadreCard = document.getElementById('role-card-cadre');
+  const teacherCard = document.getElementById('role-card-teacher');
+  if (cadreCard) cadreCard.classList.remove('selected');
+  if (teacherCard) teacherCard.classList.remove('selected');
+
+  const targetCard = document.getElementById('role-card-' + type);
+  if (targetCard) targetCard.classList.add('selected');
+
   document.getElementById('role-sub-cadre').classList.add('hidden');
   document.getElementById('role-sub-teacher').classList.add('hidden');
   document.getElementById('role-pin-wrap').classList.add('hidden');
@@ -654,8 +668,10 @@ function selectRoleCard(type) {
     APP.posterType = 'viewer';
     document.getElementById('role-continue-wrap').classList.remove('hidden');
     document.getElementById('btn-role-continue').textContent = '進入佈告欄';
-  } else {
+  } else if (type === 'cadre') {
     document.getElementById('role-sub-cadre').classList.remove('hidden');
+  } else if (type === 'teacher') {
+    document.getElementById('role-sub-teacher').classList.remove('hidden');
   }
 }
 
