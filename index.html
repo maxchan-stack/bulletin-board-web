@@ -724,7 +724,7 @@ async function verifyRolePin() {
       document.getElementById('role-pin').focus();
     }
   } catch (e) {
-    document.getElementById('pin-error').textContent = '無法連線驗證，請確認網路後重試';
+    document.getElementById('pin-error').textContent = '驗證出錯: ' + e.message + ' (請嘗試強制重新整理網頁)';
     console.error('PIN fetch error:', e);
   } finally {
     btn.disabled = false;
