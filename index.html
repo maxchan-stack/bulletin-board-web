@@ -340,6 +340,10 @@
         <div class="header-subtitle" id="header-subtitle">Classroom Bulletin Board</div>
       </div>
     </div>
+    <div class="header-nav hidden" id="header-nav" style="display: flex; gap: 8px; margin-left: 12px; margin-right: auto;">
+      <button class="btn btn-ghost btn-sm" onclick="showAdminBoard()" style="padding: 5px 10px; font-size: 0.75rem;">📢 公告欄</button>
+      <button class="btn btn-ghost btn-sm" onclick="showAdminEdit()" style="padding: 5px 10px; font-size: 0.75rem;">✏️ 新增公告</button>
+    </div>
     <span class="header-role-badge badge-viewer" id="role-badge">瀏覽</span>
   </div>
 </header>
@@ -420,6 +424,13 @@
         <div class="section-date" id="board-date"></div>
       </div>
       <button class="btn btn-ghost btn-sm" onclick="loadBoard()">重新整理</button>
+    </div>
+
+    <!-- 統計資訊面版 (僅管理員可見) -->
+    <div id="admin-stats-box" class="hidden" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; background: rgba(92,77,67,0.05); border: 1.5px solid var(--c-border); border-radius: var(--radius-md); padding: 12px 16px;">
+      <div style="text-align: center;"><div style="font-size: 0.75rem; color: var(--c-text-muted); font-weight: 500;">作業總數</div><div id="stat-hw" style="font-size: 1.3rem; font-weight: 600; color: var(--c-hw);">0</div></div>
+      <div style="text-align: center; border-left: 1px solid var(--c-border); border-right: 1px solid var(--c-border);"><div style="font-size: 0.75rem; color: var(--c-text-muted); font-weight: 500;">小考總數</div><div id="stat-quiz" style="font-size: 1.3rem; font-weight: 600; color: var(--c-quiz);">0</div></div>
+      <div style="text-align: center;"><div style="font-size: 0.75rem; color: var(--c-text-muted); font-weight: 500;">交代事項</div><div id="stat-note" style="font-size: 1.3rem; font-weight: 600; color: var(--c-note);">0</div></div>
     </div>
 
     <div class="filter-bar">
@@ -519,6 +530,7 @@ const CONFIG = {
   SPREADSHEET_ID: '1p2Ii2M8dOGdBffuLe0hvE40P6qmfj4SS55uQ4_9bQrQ',
   FORM_ID:        '1_GTG8t2-uI96uG7hi1d0IuTkUCk_kz_GTPC26Binxv0',
   RESPONSE_SHEET: '表單回應 2',
+  WEB_APP_URL:    'https://script.google.com/macros/s/AKfycby_3DMV8oHJmNp04l0YJbgb0cm1I6N07zuWR4UI1KeMvvZ8n2YDvWw9EyZorPzXFT4t/exec',
   FORM_ENTRIES: {
     category:   'entry.881129735',
     subject:    'entry.511209487',
@@ -544,7 +556,8 @@ const APP = {
   verifiedPin:  false,
   allBulletins: [],
   activeFilter: 'all',
-  isSubmitting: false
+  isSubmitting: false,
+  adminSecret:  null    // 儲存管理員金鑰
 };
 
 // ═══════════════════════════════════════════════════════
@@ -553,11 +566,13 @@ const APP = {
 window.addEventListener('DOMContentLoaded', () => {
   // 管理後台：URL 包含 ?admin=XXX 時
   const urlParams = new URLSearchParams(window.location.search);
-  if (urlParams.get('admin')) {
+  const adminSecret = urlParams.get('admin');
+  if (adminSecret) {
     APP.role = 'editor';
     APP.posterType = 'teacher';
     APP.posterLabel = '導師';
     APP.verifiedPin = true;
+    APP.adminSecret = adminSecret; // 儲存管理員金鑰
     updateHeader();
     showPage('edit');
     document.getElementById('selected-poster-text').textContent = '導師';
@@ -610,7 +625,12 @@ function hideLoading() { document.getElementById('page-loading').classList.add('
 
 function goToRolePage() {
   APP.role = null; APP.posterType = null; APP.posterLabel = '';
-  APP.posterSubject = ''; APP.verifiedPin = false;
+  APP.posterSubject = ''; APP.verifiedPin = false; APP.adminSecret = null;
+  // 清除 URL 中的 admin 參數，徹底結束管理模式
+  const url = new URL(window.location.href);
+  url.searchParams.delete('admin');
+  window.history.replaceState({}, '', url.toString());
+
   resetRolePage();
   showPage('role');
   updateHeader();
@@ -634,13 +654,20 @@ function resetRolePage() {
 
 function updateHeader() {
   const badge = document.getElementById('role-badge');
+  const nav = document.getElementById('header-nav');
   badge.className = 'header-role-badge';
-  if (APP.role === 'editor') {
+  if (APP.adminSecret) {
+    badge.className = 'header-role-badge badge-admin';
+    badge.textContent = '導師管理';
+    if (nav) nav.classList.remove('hidden');
+  } else if (APP.role === 'editor') {
     badge.classList.add('badge-editor');
     badge.textContent = '發布者';
+    if (nav) nav.classList.add('hidden');
   } else {
     badge.className = 'header-role-badge badge-viewer';
     badge.textContent = '瀏覽';
+    if (nav) nav.classList.add('hidden');
   }
 }
 
@@ -828,10 +855,21 @@ async function fetchBulletins() {
     const getVal = (idx) => {
       const cell = c[idx];
       if (!cell || cell.v === null || cell.v === undefined) return '';
-      // Google gviz date format: Date(y,m,d) -> 0-based month
+      // Google gviz date format: Date(y,m,d) -> 0-based month, 支援時間戳記解析
       if (typeof cell.v === 'string' && cell.v.startsWith('Date(')) {
-        const m = cell.v.match(/Date\((\d+),(\d+),(\d+)/);
-        if (m) return `${m[1]}-${String(+m[2]+1).padStart(2,'0')}-${String(+m[3]).padStart(2,'0')}`;
+        const m = cell.v.match(/Date\((\d+),(\d+),(\d+)(?:,(\d+),(\d+),(\d+))?/);
+        if (m) {
+          const year = m[1];
+          const month = String(+m[2]+1).padStart(2,'0');
+          const day = String(+m[3]).padStart(2,'0');
+          if (m[4] !== undefined) {
+            const hour = String(+m[4]).padStart(2,'0');
+            const min = String(+m[5]).padStart(2,'0');
+            const sec = String(+m[6]).padStart(2,'0');
+            return `${year}-${month}-${day}T${hour}:${min}:${sec}`;
+          }
+          return `${year}-${month}-${day}`;
+        }
       }
       return String(cell.v);
     };
@@ -870,8 +908,34 @@ function setFilter(filter) {
 }
 
 function renderBulletins(bulletins) {
+  if (APP.adminSecret) {
+    const statsBox = document.getElementById('admin-stats-box');
+    if (statsBox) {
+      statsBox.classList.remove('hidden');
+      calculateStats(bulletins);
+    }
+  } else {
+    const statsBox = document.getElementById('admin-stats-box');
+    if (statsBox) statsBox.classList.add('hidden');
+  }
   const filtered = APP.activeFilter === 'all' ? bulletins : bulletins.filter(b => b.category === APP.activeFilter);
   renderBulletinList(filtered);
+}
+
+function calculateStats(bulletins) {
+  let hwCount = 0;
+  let quizCount = 0;
+  let noteCount = 0;
+
+  bulletins.forEach(b => {
+    if (b.category === '作業') hwCount++;
+    else if (b.category === '小考') quizCount++;
+    else if (b.category === '交代事項') noteCount++;
+  });
+
+  document.getElementById('stat-hw').textContent = hwCount;
+  document.getElementById('stat-quiz').textContent = quizCount;
+  document.getElementById('stat-note').textContent = noteCount;
 }
 
 function renderBulletinList(list) {
@@ -902,6 +966,11 @@ function renderBulletinList(list) {
       else daysHTML = `<span class="days-left days-past">已截止</span>`;
     }
 
+    let deleteBtnHTML = '';
+    if (APP.adminSecret) {
+      deleteBtnHTML = `<button class="btn btn-danger btn-sm" onclick="deleteAnnouncement('${b.timestamp}', event)" style="padding: 4px 10px; font-size: 0.72rem; display: inline-flex; align-items: center; gap: 4px; border-radius: var(--radius-sm);">🗑️ 隱藏</button>`;
+    }
+
     const card = document.createElement('div');
     card.className = 'card';
     card.innerHTML = `
@@ -910,6 +979,7 @@ function renderBulletinList(list) {
         <div class="card-meta">
           <span class="tag ${tagClass}">${b.category}</span>
           <span class="subject-tag">${b.subject || '一般'}</span>
+          ${deleteBtnHTML ? `<div style="margin-left: auto;">${deleteBtnHTML}</div>` : ''}
         </div>
         <div class="card-content">${escHtml(b.content)}</div>
         <div class="card-footer">
@@ -924,6 +994,50 @@ function renderBulletinList(list) {
   });
 
   container.appendChild(grid);
+}
+
+async function deleteAnnouncement(timestamp, event) {
+  if (event) event.stopPropagation();
+  if (!confirm('確定要將此公告從佈告欄中隱藏嗎？')) return;
+
+  showToast('正在處理中...', 'info');
+
+  try {
+    const payload = {
+      action: 'updateStatus',
+      adminSecret: APP.adminSecret,
+      timestamp: timestamp,
+      status: 'hidden'
+    };
+
+    const response = await fetch(CONFIG.WEB_APP_URL, {
+      method: 'POST',
+      mode: 'cors',
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const result = await response.json();
+    if (result.success) {
+      showToast('公告已成功隱藏', 'success');
+      loadBoard(); // 重新整理佈告欄
+    } else {
+      showToast('操作失敗：' + (result.error || '未知錯誤'), 'error');
+    }
+  } catch (e) {
+    showToast('網路連線失敗或權限不足', 'error');
+    console.error('Delete error:', e);
+  }
+}
+
+function showAdminBoard() {
+  loadBoard();
+}
+
+function showAdminEdit() {
+  showPage('edit');
 }
 
 // ═══════════════════════════════════════════════════════
