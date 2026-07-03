@@ -141,11 +141,10 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      background: #FAF6EF;
-      border: 1.5px solid rgba(200, 134, 42, 0.22);
-      border-radius: var(--radius-lg);
+      background: transparent;
+      border: none;
       padding: 12px 20px;
-      box-shadow: var(--shadow-sm);
+      box-shadow: none;
       min-width: 130px;
       height: 100px;
       flex-shrink: 0;
@@ -153,8 +152,6 @@
     }
     .role-huge-date:hover {
       transform: scale(1.04);
-      box-shadow: var(--shadow-card);
-      border-color: rgba(181, 112, 90, 0.35);
     }
     .huge-date-month-day {
       font-family: 'Outfit', 'Inter', -apple-system, sans-serif;
@@ -233,6 +230,8 @@
     }
     .role-card-icon { font-size: 1.4rem; margin-bottom: 12px; display: block; }
     .role-card-name { font-size: 0.97rem; font-weight: 600; color: var(--c-text); margin-bottom: 5px; white-space: nowrap; }
+    .role-name-student { color: var(--c-primary); }
+    .role-name-parent { color: var(--c-quiz); }
     .role-card-desc { font-size: 0.77rem; color: var(--c-text-muted); line-height: 1.6; }
 
     .role-sub-select {
@@ -536,7 +535,7 @@
     <div class="role-cards">
       <div class="role-card" id="role-card-viewer" onclick="selectRoleCard('viewer')">
         <span class="role-card-icon">📖</span>
-        <div class="role-card-name">學生<br>家長</div>
+        <div class="role-card-name"><span class="role-name-student">學生</span><br><span class="role-name-parent">家長</span></div>
         <div class="role-card-desc">瀏覽作業、小考、老師交代事項與學校行政公告</div>
       </div>
       <div class="role-card" id="role-card-cadre" onclick="selectRoleCard('cadre')">
