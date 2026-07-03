@@ -267,6 +267,48 @@
       100% { transform: scale(1); }
     }
 
+    /* 首頁跑馬燈通知 */
+    .marquee-container {
+      display: flex;
+      align-items: center;
+      background: #FAF6EF;
+      border: 1px solid rgba(181, 112, 90, 0.2);
+      border-radius: var(--radius-md);
+      padding: 10px 16px;
+      margin-bottom: 28px;
+      font-size: 0.85rem;
+      color: #8C6A5A;
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+    }
+    .marquee-icon {
+      font-weight: 600;
+      margin-right: 8px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      color: var(--c-quiz);
+    }
+    .marquee-wrapper {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+      height: 1.25rem;
+    }
+    .marquee-content {
+      display: inline-block;
+      white-space: nowrap;
+      position: absolute;
+      will-change: transform;
+      animation: marqueeMove 15s linear infinite;
+      padding-left: 100%;
+    }
+    @keyframes marqueeMove {
+      0%   { transform: translate3d(0, 0, 0); }
+      100% { transform: translate3d(-100%, 0, 0); }
+    }
+
     .empty-state { text-align: center; padding: 64px 24px; }
     .empty-state-icon { font-size: 36px; margin-bottom: 12px; opacity: 0.35; }
     .empty-state-text { font-size: 0.87rem; color: var(--c-text-muted); }
@@ -395,6 +437,13 @@
 
   <!-- Page: 角色選擇 -->
   <div id="page-role" class="hidden">
+     <!-- 重要通知跑馬燈 -->
+    <div id="role-marquee-container" class="marquee-container hidden">
+      <span class="marquee-icon">📢 重要通知：</span>
+      <div class="marquee-wrapper">
+        <div id="role-marquee-text" class="marquee-content"></div>
+      </div>
+    </div>
     <div class="role-header">
       <div class="role-eyebrow">CLASSROOM BULLETIN BOARD</div>
       <h1>您的身份是？</h1>
@@ -626,6 +675,7 @@ window.addEventListener('DOMContentLoaded', () => {
   showPage('role');
   populateRoleSelects();
   hideLoading();
+  initMarqueeData();
 });
 
 function populateRoleSelects() {
@@ -682,6 +732,45 @@ function goToRolePage() {
   resetRolePage();
   showPage('role');
   updateHeader();
+}
+
+async function initMarqueeData() {
+  try {
+    const bulletins = await fetchBulletins();
+    APP.allBulletins = bulletins; // 快速快取公告，加速後續載入
+    
+    // 篩選出未截止的「學校行政公告」與「老師交代事項」
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const activeAnnouncements = bulletins.filter(b => {
+      if (b.status === '隱藏') return false;
+      if (b.category !== '老師交代事項' && b.category !== '交代事項' && b.category !== '學校行政公告') return false;
+      if (b.dueDate) {
+        const due = new Date(b.dueDate);
+        due.setHours(0,0,0,0);
+        return due >= today;
+      }
+      return true;
+    });
+    
+    if (activeAnnouncements.length > 0) {
+      const text = activeAnnouncements.map(b => `【${b.category} / ${b.subject || '一般'}】${b.content}`).join('　　★　　');
+      const marqueeTextEl = document.getElementById('role-marquee-text');
+      const marqueeContainerEl = document.getElementById('role-marquee-container');
+      if (marqueeTextEl && marqueeContainerEl) {
+        marqueeTextEl.textContent = text;
+        marqueeContainerEl.classList.remove('hidden');
+        
+        // 根據文字寬度，動態調整跑馬燈的播放時間
+        const speed = 40;
+        const textWidth = marqueeTextEl.offsetWidth || (text.length * 14);
+        const duration = Math.max(12, textWidth / speed);
+        marqueeTextEl.style.animationDuration = `${duration}s`;
+      }
+    }
+  } catch (e) {
+    console.warn('載入跑馬燈資料失敗：', e);
+  }
 }
 
 function resetRolePage() {
