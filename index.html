@@ -13,34 +13,34 @@
        MUJI 無印良品色彩系統
     ═══════════════════════════════════ */
     :root {
-      --c-bg:           #F7F4F1;
+      --c-bg:           #f4f6f7;
       --c-surface:      #FFFFFF;
-      --c-surface-2:    #F2EDE8;
-      --c-surface-3:    #EAE3DB;
-      --c-border:       #DDD5CB;
-      --c-border-hover: #A8988D;
-      --c-text:         #3A3330;
-      --c-text-muted:   #7E6E64;
-      --c-text-dim:     #B5A89E;
-      --c-primary:      #5C4D43;
-      --c-primary-dim:  rgba(92,77,67,0.07);
-      --c-hw:           #5B7FA8;
-      --c-hw-dim:       rgba(91,127,168,0.09);
-      --c-quiz:         #B5705A;
-      --c-quiz-dim:     rgba(181,112,90,0.09);
-      --c-note:         #6A9E7C;
-      --c-note-dim:     rgba(106,158,124,0.09);
+      --c-surface-2:    #e7f0ef;
+      --c-surface-3:    #d4e5e3;
+      --c-border:       #dde4e3;
+      --c-border-hover: #1a5d57;
+      --c-text:         #243231;
+      --c-text-muted:   #5b6c6a;
+      --c-text-dim:     #8b9997;
+      --c-primary:      #1a5d57;
+      --c-primary-dim:  rgba(26,93,87,0.08);
+      --c-hw:           #4C729F;
+      --c-hw-dim:       rgba(76,114,159,0.09);
+      --c-quiz:         #c8862a;
+      --c-quiz-dim:     rgba(200,134,42,0.09);
+      --c-note:         #2e7d32;
+      --c-note-dim:     rgba(46,125,50,0.09);
       --c-admin:        #8A738F;
       --c-admin-dim:    rgba(138,115,143,0.09);
-      --c-danger:       #B5705A;
-      --c-success:      #6A9E7C;
-      --c-warn:         #B89A4A;
+      --c-danger:       #c62828;
+      --c-success:      #2e7d32;
+      --c-warn:         #b26a00;
       --radius-sm:      4px;
       --radius-md:      8px;
       --radius-lg:      12px;
-      --shadow-sm:      0 1px 3px rgba(60,45,35,0.07);
-      --shadow-card:    0 2px 10px rgba(60,45,35,0.08);
-      --shadow-lg:      0 6px 28px rgba(60,45,35,0.13);
+      --shadow-sm:      0 1px 3px rgba(20,40,38,0.08);
+      --shadow-card:    0 2px 10px rgba(20,40,38,0.09);
+      --shadow-lg:      0 6px 28px rgba(20,40,38,0.14);
       --transition:     0.18s ease;
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -142,7 +142,7 @@
       align-items: center;
       justify-content: center;
       background: #FAF6EF;
-      border: 1.5px solid rgba(181, 112, 90, 0.22);
+      border: 1.5px solid rgba(200, 134, 42, 0.22);
       border-radius: var(--radius-lg);
       padding: 12px 20px;
       box-shadow: var(--shadow-sm);
@@ -232,7 +232,7 @@
       font-weight: bold;
     }
     .role-card-icon { font-size: 1.4rem; margin-bottom: 12px; display: block; }
-    .role-card-name { font-size: 0.97rem; font-weight: 600; color: var(--c-text); margin-bottom: 5px; }
+    .role-card-name { font-size: 0.97rem; font-weight: 600; color: var(--c-text); margin-bottom: 5px; white-space: nowrap; }
     .role-card-desc { font-size: 0.77rem; color: var(--c-text-muted); line-height: 1.6; }
 
     .role-sub-select {
@@ -536,7 +536,7 @@
     <div class="role-cards">
       <div class="role-card" id="role-card-viewer" onclick="selectRoleCard('viewer')">
         <span class="role-card-icon">📖</span>
-        <div class="role-card-name">學生 / 家長</div>
+        <div class="role-card-name">學生<br>家長</div>
         <div class="role-card-desc">瀏覽作業、小考、老師交代事項與學校行政公告</div>
       </div>
       <div class="role-card" id="role-card-cadre" onclick="selectRoleCard('cadre')">
