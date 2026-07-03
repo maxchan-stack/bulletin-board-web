@@ -146,12 +146,24 @@
       padding: 12px 20px;
       box-shadow: none;
       min-width: 130px;
-      height: 100px;
       flex-shrink: 0;
       transition: var(--transition);
     }
     .role-huge-date:hover {
       transform: scale(1.04);
+    }
+    .huge-date-weather {
+      font-size: 0.73rem;
+      color: var(--c-text-muted);
+      margin-top: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      font-weight: 500;
+    }
+    .huge-date-weather .weather-icon {
+      font-size: 0.85rem;
     }
     .huge-date-month-day {
       font-family: 'Outfit', 'Inter', -apple-system, sans-serif;
@@ -191,7 +203,6 @@
       .role-huge-date {
         padding: 8px 14px;
         min-width: 110px;
-        height: 85px;
       }
       .huge-date-month-day {
         font-size: 1.85rem;
@@ -529,6 +540,7 @@
       <div class="role-huge-date" id="role-huge-date">
         <div class="huge-date-month-day"><span id="role-date-month">--</span><span class="huge-date-label">月</span><span id="role-date-day">--</span><span class="huge-date-label">日</span></div>
         <div class="huge-date-dayofweek" id="role-date-dayofweek">--</div>
+        <div class="huge-date-weather" id="role-weather-info"></div>
       </div>
     </div>
 
@@ -872,6 +884,89 @@ function setRolePageDate() {
   if (monthEl) monthEl.textContent = monthStr;
   if (dayEl) dayEl.textContent = dayStr;
   if (dayOfWeekEl) dayOfWeekEl.textContent = dayOfWeekStr;
+  
+  initWeatherData();
+}
+
+async function initWeatherData() {
+  const weatherEl = document.getElementById('role-weather-info');
+  if (!weatherEl) return;
+
+  try {
+    const ipRes = await fetch('https://ipwho.is/');
+    if (!ipRes.ok) throw new Error('IP 定位請求失敗');
+    const ipData = await ipRes.json();
+    
+    if (!ipData.success) throw new Error(ipData.message || 'IP 定位失敗');
+    const { latitude, longitude, city } = ipData;
+    
+    const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`;
+    const weatherRes = await fetch(weatherUrl);
+    if (!weatherRes.ok) throw new Error('天氣資料請求失敗');
+    const weatherData = await weatherRes.json();
+    
+    const current = weatherData.current_weather;
+    if (!current) throw new Error('無當前氣象資料');
+    
+    const temp = Math.round(current.temperature);
+    const code = current.weathercode;
+    
+    const weatherMap = {
+      0:  ['☀️', '晴朗'],
+      1:  ['🌤️', '晴時多雲'],
+      2:  ['⛅', '多雲'],
+      3:  ['☁️', '陰天'],
+      45: ['🌫️', '有霧'],
+      48: ['🌫️', '有霧'],
+      51: ['🌧️', '毛毛雨'],
+      53: ['🌧️', '毛毛雨'],
+      55: ['🌧️', '毛毛雨'],
+      61: ['🌧️', '小雨'],
+      63: ['🌧️', '中雨'],
+      65: ['🌧️', '大雨'],
+      71: ['❄️', '小雪'],
+      73: ['❄️', '中雪'],
+      75: ['❄️', '大雪'],
+      80: ['🌧️', '陣雨'],
+      81: ['🌧️', '陣雨'],
+      82: ['🌧️', '暴雨'],
+      95: ['⛈️', '雷陣雨'],
+      96: ['⛈️', '雷陣雨'],
+      99: ['⛈️', '雷陣雨']
+    };
+    
+    const [icon, desc] = weatherMap[code] || ['🌡️', '觀測中'];
+    
+    const cityTranslation = {
+      'Taipei': '台北',
+      'New Taipei': '新北',
+      'Keelung': '基隆',
+      'Taoyuan': '桃園',
+      'Hsinchu': '新竹',
+      'Miaoli': '苗栗',
+      'Taichung': '台中',
+      'Changhua': '彰化',
+      'Nantou': '南投',
+      'Yunlin': '雲林',
+      'Chiayi': '嘉義',
+      'Tainan': '台南',
+      'Kaohsiung': '高雄',
+      'Pingtung': '屏東',
+      'Yilan': '宜蘭',
+      'Hualien': '花蓮',
+      'Taitung': '台東',
+      'Penghu': '澎湖',
+      'Kinmen': '金門',
+      'Lienchiang': '連江'
+    };
+    
+    const displayCity = cityTranslation[city] || city;
+    
+    weatherEl.innerHTML = `<span class="weather-icon">${icon}</span> ${displayCity} ${temp}°C (${desc})`;
+  } catch (e) {
+    console.warn('載入天氣資料失敗：', e);
+    weatherEl.innerHTML = '';
+  }
 }
 
 function resetRolePage() {
