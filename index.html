@@ -130,10 +130,11 @@
       justify-content: space-between;
       align-items: center;
       margin-bottom: 40px;
-      gap: 24px;
+      gap: 16px;
     }
     .role-header-left {
       flex: 1;
+      min-width: 0;
     }
     .role-huge-date {
       display: flex;
@@ -143,10 +144,10 @@
       background: #FAF6EF;
       border: 1.5px solid rgba(181, 112, 90, 0.22);
       border-radius: var(--radius-lg);
-      padding: 16px 28px;
+      padding: 12px 20px;
       box-shadow: var(--shadow-sm);
-      min-width: 150px;
-      height: 120px;
+      min-width: 130px;
+      height: 100px;
       flex-shrink: 0;
       transition: var(--transition);
     }
@@ -157,45 +158,52 @@
     }
     .huge-date-month-day {
       font-family: 'Outfit', 'Inter', -apple-system, sans-serif;
-      font-size: 3rem;
+      font-size: 2.25rem;
       font-weight: 800;
       color: var(--c-primary);
       line-height: 1.1;
       display: flex;
-      align-items: center;
+      align-items: baseline;
       letter-spacing: -0.02em;
     }
-    .huge-date-divider {
-      color: rgba(181, 112, 90, 0.3);
-      margin: 0 4px;
-      font-size: 2.25rem;
-      font-weight: 300;
+    .huge-date-label {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--c-text-muted);
+      margin: 0 2px;
     }
     .huge-date-dayofweek {
-      font-size: 0.8rem;
-      color: var(--c-text-muted);
+      font-size: 0.75rem;
+      color: var(--c-text-dim);
       font-weight: 600;
-      margin-top: 6px;
-      letter-spacing: 0.15em;
+      margin-top: 4px;
+      letter-spacing: 0.1em;
     }
     .role-eyebrow { font-size: 0.73rem; color: var(--c-text-dim); letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 10px; }
     .role-header h1 { font-family: 'Noto Serif TC', serif; font-size: 1.75rem; font-weight: 500; color: var(--c-text); letter-spacing: 0.05em; line-height: 1.35; margin-bottom: 10px; }
     .role-header p { font-size: 0.87rem; color: var(--c-text-muted); line-height: 1.8; }
 
     @media (max-width: 580px) {
-      .role-header {
-        flex-direction: column;
-        align-items: center;
-        text-align: center;
-        gap: 20px;
+      .role-header h1 {
+        font-size: 1.45rem;
       }
-      .role-header-left {
-        text-align: center;
+      .role-header p {
+        font-size: 0.8rem;
+        line-height: 1.6;
       }
       .role-huge-date {
-        margin-left: 0;
-        width: 100%;
-        max-width: 240px;
+        padding: 8px 14px;
+        min-width: 110px;
+        height: 85px;
+      }
+      .huge-date-month-day {
+        font-size: 1.85rem;
+      }
+      .huge-date-label {
+        font-size: 0.85rem;
+      }
+      .huge-date-dayofweek {
+        font-size: 0.7rem;
       }
     }
 
@@ -520,7 +528,7 @@
         <p>請選擇您的角色以繼續。<br>幹部與小老師需輸入授權碼以發布公告。</p>
       </div>
       <div class="role-huge-date" id="role-huge-date">
-        <div class="huge-date-month-day"><span id="role-date-month">--</span><span class="huge-date-divider">/</span><span id="role-date-day">--</span></div>
+        <div class="huge-date-month-day"><span id="role-date-month">--</span><span class="huge-date-label">月</span><span id="role-date-day">--</span><span class="huge-date-label">日</span></div>
         <div class="huge-date-dayofweek" id="role-date-dayofweek">--</div>
       </div>
     </div>
@@ -853,8 +861,8 @@ function setRolePageDate() {
   const now = new Date();
   const weekdays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
   
-  const monthStr = String(now.getMonth() + 1).padStart(2, '0');
-  const dayStr = String(now.getDate()).padStart(2, '0');
+  const monthStr = String(now.getMonth() + 1);
+  const dayStr = String(now.getDate());
   const dayOfWeekStr = weekdays[now.getDay()];
   
   const monthEl = document.getElementById('role-date-month');
