@@ -128,42 +128,74 @@
     .role-header {
       display: flex;
       justify-content: space-between;
-      align-items: flex-end;
+      align-items: center;
       margin-bottom: 40px;
+      gap: 24px;
     }
     .role-header-left {
       flex: 1;
     }
-    .role-today-date {
+    .role-huge-date {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #FAF6EF;
+      border: 1.5px solid rgba(181, 112, 90, 0.22);
+      border-radius: var(--radius-lg);
+      padding: 16px 28px;
+      box-shadow: var(--shadow-sm);
+      min-width: 150px;
+      height: 120px;
+      flex-shrink: 0;
+      transition: var(--transition);
+    }
+    .role-huge-date:hover {
+      transform: scale(1.04);
+      box-shadow: var(--shadow-card);
+      border-color: rgba(181, 112, 90, 0.35);
+    }
+    .huge-date-month-day {
+      font-family: 'Outfit', 'Inter', -apple-system, sans-serif;
+      font-size: 3rem;
+      font-weight: 800;
+      color: var(--c-primary);
+      line-height: 1.1;
       display: flex;
       align-items: center;
-      gap: 8px;
-      padding: 8px 16px;
-      background: #FAF6EF;
-      border: 1px solid rgba(181, 112, 90, 0.15);
-      border-radius: 20px;
-      font-size: 0.85rem;
-      color: #8C6A5A;
-      font-weight: 500;
-      box-shadow: var(--shadow-sm);
-      margin-left: 16px;
-      white-space: nowrap;
+      letter-spacing: -0.02em;
     }
-    .role-today-date .calendar-icon {
-      font-size: 0.95rem;
+    .huge-date-divider {
+      color: rgba(181, 112, 90, 0.3);
+      margin: 0 4px;
+      font-size: 2.25rem;
+      font-weight: 300;
+    }
+    .huge-date-dayofweek {
+      font-size: 0.8rem;
+      color: var(--c-text-muted);
+      font-weight: 600;
+      margin-top: 6px;
+      letter-spacing: 0.15em;
     }
     .role-eyebrow { font-size: 0.73rem; color: var(--c-text-dim); letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 10px; }
     .role-header h1 { font-family: 'Noto Serif TC', serif; font-size: 1.75rem; font-weight: 500; color: var(--c-text); letter-spacing: 0.05em; line-height: 1.35; margin-bottom: 10px; }
     .role-header p { font-size: 0.87rem; color: var(--c-text-muted); line-height: 1.8; }
 
-    @media (max-width: 600px) {
+    @media (max-width: 580px) {
       .role-header {
         flex-direction: column;
-        align-items: flex-start;
-        gap: 16px;
+        align-items: center;
+        text-align: center;
+        gap: 20px;
       }
-      .role-today-date {
+      .role-header-left {
+        text-align: center;
+      }
+      .role-huge-date {
         margin-left: 0;
+        width: 100%;
+        max-width: 240px;
       }
     }
 
@@ -487,9 +519,9 @@
         <h1>您的身份是？</h1>
         <p>請選擇您的角色以繼續。<br>幹部與小老師需輸入授權碼以發布公告。</p>
       </div>
-      <div class="role-today-date" id="role-today-date">
-        <span class="calendar-icon">📅</span>
-        <span id="role-date-text"></span>
+      <div class="role-huge-date" id="role-huge-date">
+        <div class="huge-date-month-day"><span id="role-date-month">--</span><span class="huge-date-divider">/</span><span id="role-date-day">--</span></div>
+        <div class="huge-date-dayofweek" id="role-date-dayofweek">--</div>
       </div>
     </div>
 
@@ -820,9 +852,18 @@ async function initMarqueeData() {
 function setRolePageDate() {
   const now = new Date();
   const weekdays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
-  const dateStr = `${now.getFullYear()} 年 ${now.getMonth()+1} 月 ${now.getDate()} 日 ${weekdays[now.getDay()]}`;
-  const el = document.getElementById('role-date-text');
-  if (el) el.textContent = dateStr;
+  
+  const monthStr = String(now.getMonth() + 1).padStart(2, '0');
+  const dayStr = String(now.getDate()).padStart(2, '0');
+  const dayOfWeekStr = weekdays[now.getDay()];
+  
+  const monthEl = document.getElementById('role-date-month');
+  const dayEl = document.getElementById('role-date-day');
+  const dayOfWeekEl = document.getElementById('role-date-dayofweek');
+  
+  if (monthEl) monthEl.textContent = monthStr;
+  if (dayEl) dayEl.textContent = dayStr;
+  if (dayOfWeekEl) dayOfWeekEl.textContent = dayOfWeekStr;
 }
 
 function resetRolePage() {
