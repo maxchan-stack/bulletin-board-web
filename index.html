@@ -827,6 +827,7 @@ async function initMarqueeData() {
     today.setHours(0,0,0,0);
     const activeAnnouncements = bulletins.filter(b => {
       if (b.status === '隱藏') return false;
+      if (b.marqueeStatus === '不跑馬燈') return false;
       if (b.category !== '老師交代事項' && b.category !== '交代事項' && b.category !== '學校行政公告') return false;
       if (b.dueDate) {
         const due = new Date(b.dueDate);
@@ -1118,8 +1119,9 @@ async function fetchBulletins() {
       dueDate:    getVal(3),
       content:    getVal(4),
       posterName: getVal(5),
-      posterType: getVal(6),
-      status:     getVal(7)
+      posterType:    getVal(6),
+      status:        getVal(7),
+      marqueeStatus: getVal(8)
     };
   })
   .filter(b => b.content && b.status !== '隱藏')
@@ -1239,9 +1241,20 @@ function renderBulletinList(list) {
       else daysHTML = `<span class="days-left days-past">已截止</span>`;
     }
 
-    let deleteBtnHTML = '';
+    let adminControlsHTML = '';
     if (APP.adminSecret) {
-      deleteBtnHTML = `<button class="btn btn-danger btn-sm" onclick="deleteAnnouncement('${b.timestamp}', event)" style="padding: 4px 10px; font-size: 0.72rem; display: inline-flex; align-items: center; gap: 4px; border-radius: var(--radius-sm);">🗑️ 隱藏</button>`;
+      let marqueeBtnHTML = '';
+      if (b.category === '老師交代事項' || b.category === '交代事項' || b.category === '學校行政公告') {
+        const isMarquee = b.marqueeStatus !== '不跑馬燈';
+        const btnText = isMarquee ? '🔇 關閉跑馬燈' : '📢 開啟跑馬燈';
+        const btnClass = isMarquee ? 'btn-ghost' : 'btn-primary';
+        const nextStatus = isMarquee ? 'no_marquee' : 'marquee';
+        marqueeBtnHTML = `<button class="btn ${btnClass} btn-sm" onclick="toggleMarquee('${b.timestamp}', '${nextStatus}', event)" style="padding: 4px 10px; font-size: 0.72rem; display: inline-flex; align-items: center; gap: 4px; border-radius: var(--radius-sm); margin-right: 6px;">${btnText}</button>`;
+      }
+      adminControlsHTML = `<div style="margin-left: auto; display: flex; align-items: center;">
+        ${marqueeBtnHTML}
+        <button class="btn btn-danger btn-sm" onclick="deleteAnnouncement('${b.timestamp}', event)" style="padding: 4px 10px; font-size: 0.72rem; display: inline-flex; align-items: center; gap: 4px; border-radius: var(--radius-sm);">🗑️ 隱藏</button>
+      </div>`;
     }
 
     const card = document.createElement('div');
@@ -1253,7 +1266,7 @@ function renderBulletinList(list) {
         <div class="card-meta">
           <span class="tag ${tagClass}">${b.category}</span>
           <span class="subject-tag">${b.subject || '一般'}</span>
-          ${deleteBtnHTML ? `<div style="margin-left: auto;">${deleteBtnHTML}</div>` : ''}
+          ${adminControlsHTML}
         </div>
         <div class="card-content">${escHtml(b.content)}</div>
         <div class="card-footer">
@@ -1303,6 +1316,40 @@ async function deleteAnnouncement(timestamp, event) {
   } catch (e) {
     showToast('網路連線失敗或權限不足', 'error');
     console.error('Delete error:', e);
+  }
+}
+
+async function toggleMarquee(timestamp, nextStatus, event) {
+  if (event) event.stopPropagation();
+  showToast('正在設定跑馬燈狀態...', 'info');
+
+  try {
+    const payload = {
+      action: 'updateMarquee',
+      adminSecret: APP.adminSecret,
+      timestamp: timestamp,
+      marqueeStatus: nextStatus
+    };
+
+    const response = await fetch(CONFIG.WEB_APP_URL, {
+      method: 'POST',
+      mode: 'cors',
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const result = await response.json();
+    if (result.success) {
+      showToast('已更新跑馬燈設定', 'success');
+      loadBoard(); // 重新整理佈告欄
+    } else {
+      showToast('設定失敗：' + (result.error || '未知錯誤'), 'error');
+    }
+  } catch (e) {
+    showToast('網路連線失敗或權限不足', 'error');
+    console.error('Marquee update error:', e);
   }
 }
 
