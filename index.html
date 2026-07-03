@@ -124,11 +124,48 @@
     /* ════════════════════════════
        角色選擇頁面
     ════════════════════════════ */
-    #page-role { max-width: 560px; margin: 0 auto; }
-    .role-header { margin-bottom: 40px; }
+    #page-role { max-width: 680px; margin: 0 auto; }
+    .role-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 40px;
+    }
+    .role-header-left {
+      flex: 1;
+    }
+    .role-today-date {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      background: #FAF6EF;
+      border: 1px solid rgba(181, 112, 90, 0.15);
+      border-radius: 20px;
+      font-size: 0.85rem;
+      color: #8C6A5A;
+      font-weight: 500;
+      box-shadow: var(--shadow-sm);
+      margin-left: 16px;
+      white-space: nowrap;
+    }
+    .role-today-date .calendar-icon {
+      font-size: 0.95rem;
+    }
     .role-eyebrow { font-size: 0.73rem; color: var(--c-text-dim); letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 10px; }
     .role-header h1 { font-family: 'Noto Serif TC', serif; font-size: 1.75rem; font-weight: 500; color: var(--c-text); letter-spacing: 0.05em; line-height: 1.35; margin-bottom: 10px; }
     .role-header p { font-size: 0.87rem; color: var(--c-text-muted); line-height: 1.8; }
+
+    @media (max-width: 600px) {
+      .role-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+      }
+      .role-today-date {
+        margin-left: 0;
+      }
+    }
 
     .role-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px; margin-bottom: 24px; }
     .role-card {
@@ -445,9 +482,15 @@
       </div>
     </div>
     <div class="role-header">
-      <div class="role-eyebrow">CLASSROOM BULLETIN BOARD</div>
-      <h1>您的身份是？</h1>
-      <p>請選擇您的角色以繼續。<br>幹部與小老師需輸入授權碼以發布公告。</p>
+      <div class="role-header-left">
+        <div class="role-eyebrow">CLASSROOM BULLETIN BOARD</div>
+        <h1>您的身份是？</h1>
+        <p>請選擇您的角色以繼續。<br>幹部與小老師需輸入授權碼以發布公告。</p>
+      </div>
+      <div class="role-today-date" id="role-today-date">
+        <span class="calendar-icon">📅</span>
+        <span id="role-date-text"></span>
+      </div>
     </div>
 
     <div class="role-cards">
@@ -676,6 +719,7 @@ window.addEventListener('DOMContentLoaded', () => {
   populateRoleSelects();
   hideLoading();
   initMarqueeData();
+  setRolePageDate();
 });
 
 function populateRoleSelects() {
@@ -771,6 +815,14 @@ async function initMarqueeData() {
   } catch (e) {
     console.warn('載入跑馬燈資料失敗：', e);
   }
+}
+
+function setRolePageDate() {
+  const now = new Date();
+  const weekdays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+  const dateStr = `${now.getFullYear()} 年 ${now.getMonth()+1} 月 ${now.getDate()} 日 ${weekdays[now.getDay()]}`;
+  const el = document.getElementById('role-date-text');
+  if (el) el.textContent = dateStr;
 }
 
 function resetRolePage() {
