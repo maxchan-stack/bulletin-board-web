@@ -216,7 +216,7 @@
       background: var(--c-surface); border: 1px solid var(--c-border);
       border-radius: var(--radius-lg); padding: 20px 22px; display: flex; gap: 14px;
       box-shadow: var(--shadow-sm);
-      transition: var(--transition); animation: cardIn 0.25s ease both;
+      transition: var(--transition); animation: cardIn 0.25s ease var(--delay, 0s) both;
     }
     .card:hover {
       background: var(--c-surface);
@@ -248,6 +248,24 @@
     .days-urgent { background: rgba(181,112,90,0.07); color: var(--c-quiz); }
     .days-normal { background: var(--c-surface-2); color: var(--c-text-muted); border: 1px solid var(--c-border); }
     .days-past   { background: var(--c-surface-2); color: var(--c-text-dim); border: 1px solid var(--c-border); }
+
+    /* 緊急標籤呼吸燈與統計回彈動畫 */
+    .days-today, .days-urgent {
+      animation: labelPulse 2s infinite ease-in-out;
+    }
+    @keyframes labelPulse {
+      0%, 100% { opacity: 0.85; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.03); }
+    }
+    .stats-bounce {
+      display: inline-block;
+      animation: bouncePulse 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    @keyframes bouncePulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.15); }
+      100% { transform: scale(1); }
+    }
 
     .empty-state { text-align: center; padding: 64px 24px; }
     .empty-state-icon { font-size: 36px; margin-bottom: 12px; opacity: 0.35; }
@@ -353,7 +371,7 @@
 <!-- Header -->
 <header class="header">
   <div class="header-inner">
-    <div class="header-brand" onclick="goToRolePage()" style="cursor:pointer;">
+    <div class="header-brand" onclick="handleLogoClick()" style="cursor:pointer;">
       <div>
         <div class="header-title" id="header-title">高二甲班電子佈告欄</div>
         <div class="header-subtitle" id="header-subtitle">Classroom Bulletin Board</div>
@@ -564,7 +582,7 @@ const CONFIG = {
   // 幹部職稱列表
   CADRE_TITLES: ['班長','副班長','學藝股長','風紀股長','衛生股長','體育股長','資訊股長','總務股長','環保股長'],
   // 小老師科目列表
-  TEACHER_SUBJECTS: ['班級公告','國文','英文','數學','物理','化學','生物','歷史','地理','公民','體育','音樂','美術']
+  TEACHER_SUBJECTS: ['班級公告','國文','英文','數學','物理','化學','生物','地科','歷史','地理','公民','體育','音樂','美術']
 };
 
 // ═══════════════════════════════════════════════════════
@@ -644,6 +662,14 @@ function showPage(pageId) {
 }
 
 function hideLoading() { document.getElementById('page-loading').classList.add('hidden'); }
+
+function handleLogoClick() {
+  if (APP.adminSecret) {
+    showPage('board');
+  } else {
+    goToRolePage();
+  }
+}
 
 function goToRolePage() {
   APP.role = null; APP.posterType = null; APP.posterLabel = '';
@@ -968,11 +994,26 @@ function calculateStats(bulletins) {
     else if (b.category === '學校行政公告') adminCount++;
   });
 
-  document.getElementById('stat-hw').textContent = hwCount;
-  document.getElementById('stat-quiz').textContent = quizCount;
-  document.getElementById('stat-note').textContent = noteCount;
-  const statAdmin = document.getElementById('stat-admin');
-  if (statAdmin) statAdmin.textContent = adminCount;
+  const updateStatVal = (id, val) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (el.textContent !== String(val)) {
+      el.textContent = val;
+      el.classList.remove('stats-bounce');
+      void el.offsetWidth;
+      el.classList.add('stats-bounce');
+      const cleanUp = () => {
+        el.classList.remove('stats-bounce');
+        el.removeEventListener('animationend', cleanUp);
+      };
+      el.addEventListener('animationend', cleanUp);
+    }
+  };
+
+  updateStatVal('stat-hw', hwCount);
+  updateStatVal('stat-quiz', quizCount);
+  updateStatVal('stat-note', noteCount);
+  updateStatVal('stat-admin', adminCount);
 }
 
 function renderBulletinList(list) {
@@ -989,7 +1030,7 @@ function renderBulletinList(list) {
   const grid = document.createElement('div');
   grid.className = 'cards-grid';
 
-  list.forEach(b => {
+  list.forEach((b, i) => {
     const catMap = { 
       '作業': ['hw','tag-hw'], 
       '小考': ['quiz','tag-quiz'], 
@@ -1016,6 +1057,7 @@ function renderBulletinList(list) {
 
     const card = document.createElement('div');
     card.className = 'card';
+    card.style.setProperty('--delay', `${i * 0.04}s`);
     card.innerHTML = `
       <div class="card-accent accent-${accentKey}"></div>
       <div class="card-body">
