@@ -35,6 +35,8 @@
       --c-danger:       #c62828;
       --c-success:      #2e7d32;
       --c-warn:         #b26a00;
+      --c-expired:      #5f6a6a;
+      --c-expired-dim:  rgba(95,106,106,0.09);
       --radius-sm:      4px;
       --radius-md:      8px;
       --radius-lg:      12px;
@@ -152,19 +154,7 @@
     .role-huge-date:hover {
       transform: scale(1.04);
     }
-    .huge-date-weather {
-      font-size: 0.73rem;
-      color: var(--c-text-muted);
-      margin-top: 6px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 4px;
-      font-weight: 500;
-    }
-    .huge-date-weather .weather-icon {
-      font-size: 0.85rem;
-    }
+
     .huge-date-month-day {
       font-family: 'Outfit', 'Inter', -apple-system, sans-serif;
       font-size: 2.25rem;
@@ -296,6 +286,7 @@
     .filter-chip.active-quiz { background: var(--c-quiz-dim); border-color: rgba(181,112,90,0.3);   color: var(--c-quiz); }
     .filter-chip.active-note { background: var(--c-note-dim); border-color: rgba(106,158,124,0.3);  color: var(--c-note); }
     .filter-chip.active-admin { background: var(--c-admin-dim); border-color: rgba(138,115,143,0.3);  color: var(--c-admin); }
+    .filter-chip.active-expired { background: var(--c-expired-dim); border-color: rgba(95,106,106,0.3); color: var(--c-expired); }
 
     /* 公告卡片 */
     .cards-grid { display: flex; flex-direction: column; gap: 16px; }
@@ -524,7 +515,7 @@
 
   <!-- Page: 角色選擇 -->
   <div id="page-role" class="hidden">
-     <!-- 重要通知跑馬燈 -->
+    <!-- 重要通知跑馬燈 -->
     <div id="role-marquee-container" class="marquee-container hidden">
       <span class="marquee-icon">📢 重要通知：</span>
       <div class="marquee-wrapper">
@@ -540,7 +531,6 @@
       <div class="role-huge-date" id="role-huge-date">
         <div class="huge-date-month-day"><span id="role-date-month">--</span><span class="huge-date-label">月</span><span id="role-date-day">--</span><span class="huge-date-label">日</span></div>
         <div class="huge-date-dayofweek" id="role-date-dayofweek">--</div>
-        <div class="huge-date-weather" id="role-weather-info"></div>
       </div>
     </div>
 
@@ -620,6 +610,7 @@
       <div class="filter-chip" data-filter="小考" onclick="setFilter('小考')">小考</div>
       <div class="filter-chip" data-filter="老師交代事項" onclick="setFilter('老師交代事項')">老師交代事項</div>
       <div class="filter-chip" data-filter="學校行政公告" onclick="setFilter('學校行政公告')">學校行政公告</div>
+      <div class="filter-chip" data-filter="expired" onclick="setFilter('expired')">已過期</div>
     </div>
 
     <div id="bulletin-list"></div>
@@ -742,6 +733,16 @@ const APP = {
   isSubmitting: false,
   adminSecret:  null    // 儲存管理員金鑰
 };
+
+// 判斷公告是否已過期
+function isExpired(b) {
+  if (!b.dueDate) return false;
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const due = new Date(b.dueDate);
+  due.setHours(0,0,0,0);
+  return due < today;
+}
 
 // ═══════════════════════════════════════════════════════
 //  初始化
@@ -884,90 +885,9 @@ function setRolePageDate() {
   if (monthEl) monthEl.textContent = monthStr;
   if (dayEl) dayEl.textContent = dayStr;
   if (dayOfWeekEl) dayOfWeekEl.textContent = dayOfWeekStr;
-  
-  initWeatherData();
 }
 
-async function initWeatherData() {
-  const weatherEl = document.getElementById('role-weather-info');
-  if (!weatherEl) return;
 
-  try {
-    const ipRes = await fetch('https://ipwho.is/');
-    if (!ipRes.ok) throw new Error('IP 定位請求失敗');
-    const ipData = await ipRes.json();
-    
-    if (!ipData.success) throw new Error(ipData.message || 'IP 定位失敗');
-    const { latitude, longitude, city } = ipData;
-    
-    const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`;
-    const weatherRes = await fetch(weatherUrl);
-    if (!weatherRes.ok) throw new Error('天氣資料請求失敗');
-    const weatherData = await weatherRes.json();
-    
-    const current = weatherData.current_weather;
-    if (!current) throw new Error('無當前氣象資料');
-    
-    const temp = Math.round(current.temperature);
-    const code = current.weathercode;
-    
-    const weatherMap = {
-      0:  ['☀️', '晴朗'],
-      1:  ['🌤️', '晴時多雲'],
-      2:  ['⛅', '多雲'],
-      3:  ['☁️', '陰天'],
-      45: ['🌫️', '有霧'],
-      48: ['🌫️', '有霧'],
-      51: ['🌧️', '毛毛雨'],
-      53: ['🌧️', '毛毛雨'],
-      55: ['🌧️', '毛毛雨'],
-      61: ['🌧️', '小雨'],
-      63: ['🌧️', '中雨'],
-      65: ['🌧️', '大雨'],
-      71: ['❄️', '小雪'],
-      73: ['❄️', '中雪'],
-      75: ['❄️', '大雪'],
-      80: ['🌧️', '陣雨'],
-      81: ['🌧️', '陣雨'],
-      82: ['🌧️', '暴雨'],
-      95: ['⛈️', '雷陣雨'],
-      96: ['⛈️', '雷陣雨'],
-      99: ['⛈️', '雷陣雨']
-    };
-    
-    const [icon, desc] = weatherMap[code] || ['🌡️', '觀測中'];
-    
-    const cityTranslation = {
-      'Taipei': '台北',
-      'New Taipei': '新北',
-      'Keelung': '基隆',
-      'Taoyuan': '桃園',
-      'Hsinchu': '新竹',
-      'Miaoli': '苗栗',
-      'Taichung': '台中',
-      'Changhua': '彰化',
-      'Nantou': '南投',
-      'Yunlin': '雲林',
-      'Chiayi': '嘉義',
-      'Tainan': '台南',
-      'Kaohsiung': '高雄',
-      'Pingtung': '屏東',
-      'Yilan': '宜蘭',
-      'Hualien': '花蓮',
-      'Taitung': '台東',
-      'Penghu': '澎湖',
-      'Kinmen': '金門',
-      'Lienchiang': '連江'
-    };
-    
-    const displayCity = cityTranslation[city] || city;
-    
-    weatherEl.innerHTML = `<span class="weather-icon">${icon}</span> ${displayCity} ${temp}°C (${desc})`;
-  } catch (e) {
-    console.warn('載入天氣資料失敗：', e);
-    weatherEl.innerHTML = '';
-  }
-}
 
 function resetRolePage() {
   document.getElementById('role-card-viewer').classList.remove('selected');
@@ -1235,15 +1155,19 @@ function setFilter(filter) {
       else if (filter === '作業') el.classList.add('active-hw');
       else if (filter === '小考') el.classList.add('active-quiz');
       else if (filter === '學校行政公告') el.classList.add('active-admin');
+      else if (filter === 'expired') el.classList.add('active-expired');
       else el.classList.add('active-note');
     }
   });
   const filtered = filter === 'all'
-    ? APP.allBulletins
-    : APP.allBulletins.filter(b => {
-        if (filter === '老師交代事項') return b.category === '老師交代事項' || b.category === '交代事項';
-        return b.category === filter;
-      });
+    ? APP.allBulletins.filter(b => !isExpired(b))
+    : filter === 'expired'
+      ? APP.allBulletins.filter(b => isExpired(b))
+      : APP.allBulletins.filter(b => {
+          if (isExpired(b)) return false;
+          if (filter === '老師交代事項') return b.category === '老師交代事項' || b.category === '交代事項';
+          return b.category === filter;
+        });
   renderBulletinList(filtered);
 }
 
@@ -1259,11 +1183,14 @@ function renderBulletins(bulletins) {
     if (statsBox) statsBox.classList.add('hidden');
   }
   const filtered = APP.activeFilter === 'all'
-    ? bulletins
-    : bulletins.filter(b => {
-        if (APP.activeFilter === '老師交代事項') return b.category === '老師交代事項' || b.category === '交代事項';
-        return b.category === APP.activeFilter;
-      });
+    ? bulletins.filter(b => !isExpired(b))
+    : APP.activeFilter === 'expired'
+      ? bulletins.filter(b => isExpired(b))
+      : bulletins.filter(b => {
+          if (isExpired(b)) return false;
+          if (APP.activeFilter === '老師交代事項') return b.category === '老師交代事項' || b.category === '交代事項';
+          return b.category === APP.activeFilter;
+        });
   renderBulletinList(filtered);
 }
 
@@ -1274,6 +1201,7 @@ function calculateStats(bulletins) {
   let adminCount = 0;
 
   bulletins.forEach(b => {
+    if (isExpired(b)) return;
     if (b.category === '作業') hwCount++;
     else if (b.category === '小考') quizCount++;
     else if (b.category === '老師交代事項' || b.category === '交代事項') noteCount++;
