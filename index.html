@@ -1013,7 +1013,7 @@
         <div class="teacher-panel-desc">如需進行進階管理，請直接開啟 Google 試算表操作：</div>
         <ol class="teacher-panel-steps" style="margin-bottom: 18px;">
           <li><strong>隱藏公告</strong>：於「表單回覆 2」工作表中，將欲隱藏公告之最右側「狀態」欄位填入「<strong>隱藏</strong>」。</li>
-          <li><strong>修改今日課表</strong>：於試算表中新增一個名為「<strong>timetable</strong>」的工作表。第一欄 A 代表節次，第二欄 B 至第六欄 F 分別為星期一至星期五的課程。第一列為第 1 節，依此類推共 8 列。網頁會自動讀取並顯示。</li>
+          <li><strong>修改今日課表</strong>：於試算表中新增一個名為「<strong>timetable</strong>」的工作表。第一列（A1~F1）填寫標題（節次、星期一至五），第 2 列至第 9 列填寫第 1 節至第 8 節的課程（例如 A2 寫 1，B2~F2 寫週一至週五的課程）。網頁會自動讀取並排除首列標題，依序排列。</li>
         </ol>
         <a id="teacher-sheet-link" href="#" target="_blank" class="btn btn-ghost btn-sm">開啟 Google 試算表管理</a>
 
@@ -2869,6 +2869,13 @@ async function fetchTimetable() {
 
     rows.forEach(row => {
       const cells = row.c || [];
+      // 排除第一列標題（當含有「節次」或第二欄為「星期」等標籤時）
+      const cell0Val = cells[0]?.v ? String(cells[0].v).toLowerCase().trim() : '';
+      const cell1Val = cells[1]?.v ? String(cells[1].v).toLowerCase().trim() : '';
+      if (cell0Val.includes('節次') || cell1Val.includes('星期')) {
+        return; // 跳過標題列
+      }
+
       for (let day = 1; day <= 5; day++) {
         const val = cells[day]?.v !== null && cells[day]?.v !== undefined ? String(cells[day].v).trim() : '—';
         timetable[day].push(val);
