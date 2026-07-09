@@ -682,6 +682,84 @@
         border-left: 1px solid var(--c-border);
       }
     }
+
+    /* ── 今日課表樣式 ── */
+    .timetable-card {
+      background: var(--c-surface); border: 1.5px solid var(--c-border);
+      border-radius: var(--radius-lg); padding: 18px 20px; margin-top: 24px;
+      box-shadow: var(--shadow-sm);
+    }
+    .timetable-title {
+      font-family: 'Noto Serif TC', serif; font-size: 0.95rem; font-weight: 600;
+      color: var(--c-text); margin-bottom: 12px; letter-spacing: 0.06em;
+    }
+    .timetable-grid {
+      display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px;
+    }
+    .timetable-period {
+      background: var(--c-bg); border: 1px solid var(--c-border);
+      border-radius: var(--radius-sm); padding: 8px 4px; text-align: center;
+      display: flex; flex-direction: column; gap: 4px; transition: var(--transition);
+    }
+    .timetable-period:hover {
+      border-color: var(--c-primary); background: var(--c-primary-dim);
+    }
+    .period-num {
+      font-size: 0.65rem; color: var(--c-text-dim); font-weight: 500;
+    }
+    .period-name {
+      font-size: 0.78rem; font-weight: 600; color: var(--c-text);
+    }
+    .timetable-weekend {
+      text-align: center; font-size: 0.82rem; color: var(--c-text-muted); padding: 10px 0;
+    }
+
+    /* ── 倒數計時器樣式 ── */
+    .role-countdown-banner {
+      display: inline-flex; align-items: center; gap: 8px; margin-top: 14px;
+      padding: 6px 12px; background: rgba(200,134,42,0.06); border: 1px solid rgba(200,134,42,0.2);
+      border-radius: var(--radius-sm); font-size: 0.77rem; font-weight: 500; color: var(--c-quiz);
+      animation: labelPulse 2.5s infinite ease-in-out;
+    }
+    .countdown-tag {
+      font-weight: 600; color: #FAF8F5; background: var(--c-quiz);
+      padding: 2px 8px; border-radius: 2px; font-size: 0.68rem; letter-spacing: 0.05em;
+    }
+
+    /* ── 常用連結樣式 ── */
+    .resources-card {
+      background: var(--c-surface); border: 1.5px solid var(--c-border);
+      border-radius: var(--radius-lg); padding: 18px 20px; margin-top: 16px;
+      box-shadow: var(--shadow-sm);
+    }
+    .resources-title {
+      font-family: 'Noto Serif TC', serif; font-size: 0.95rem; font-weight: 600;
+      color: var(--c-text); margin-bottom: 12px; letter-spacing: 0.06em;
+    }
+    .resources-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+    }
+    .resource-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: 8px 10px; font-size: 0.78rem; font-weight: 500; text-decoration: none;
+      color: var(--c-text-muted); background: var(--c-bg); border: 1px solid var(--c-border);
+      border-radius: var(--radius-md); transition: var(--transition); text-align: center;
+    }
+    .resource-btn:hover {
+      border-color: var(--c-primary); color: var(--c-primary); background: var(--c-primary-dim);
+    }
+
+    @media (max-width: 479px) {
+      .timetable-grid {
+        grid-template-columns: repeat(4, 1fr); gap: 6px;
+      }
+      .timetable-period {
+        padding: 6px 2px;
+      }
+      .resources-grid {
+        grid-template-columns: 1fr 1fr; gap: 8px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -726,6 +804,11 @@
         <div class="role-eyebrow">CLASSROOM BULLETIN BOARD</div>
         <h1>您的身份是？</h1>
         <p>請選擇您的角色以繼續。<br>幹部與小老師需輸入授權碼以發布公告。</p>
+        <!-- 倒數計時器橫幅 -->
+        <div id="role-countdown-banner" class="role-countdown-banner hidden">
+          <span class="countdown-tag">倒數計時</span>
+          <span id="role-countdown-text">距離 -- 還有 -- 天</span>
+        </div>
       </div>
       <div class="role-huge-date" id="role-huge-date">
         <div class="huge-date-month-day"><span id="role-date-month">--</span><span class="huge-date-label">月</span><span id="role-date-day">--</span><span class="huge-date-label">日</span></div>
@@ -748,6 +831,25 @@
         <span class="role-card-icon">🎓</span>
         <div class="role-card-name">學科小老師</div>
         <div class="role-card-desc">發布各科作業與小考公告</div>
+      </div>
+    </div>
+
+    <!-- 今日課表區塊 -->
+    <div class="timetable-card" id="timetable-card">
+      <div class="timetable-title" id="timetable-title">今日課表 (載入中...)</div>
+      <div class="timetable-grid" id="timetable-grid">
+        <!-- 由 JS 動態生成 -->
+      </div>
+    </div>
+
+    <!-- 常用資源區塊 -->
+    <div class="resources-card" id="resources-card">
+      <div class="resources-title">常用資源</div>
+      <div class="resources-grid">
+        <a href="https://drive.google.com" target="_blank" class="resource-btn">班級雲端硬碟</a>
+        <a href="https://www.google.com" target="_blank" class="resource-btn">學校官方首頁</a>
+        <a href="https://e-portfolio.co.tw" target="_blank" class="resource-btn">學習歷程平台</a>
+        <a href="https://collego.edu.tw" target="_blank" class="resource-btn">Collego 探索</a>
       </div>
     </div>
 
@@ -913,6 +1015,24 @@
           <li>回到佈告欄重新整理即可</li>
         </ol>
         <a id="teacher-sheet-link" href="#" target="_blank" class="btn btn-ghost btn-sm">開啟 Google 試算表管理</a>
+
+        <!-- 倒數計時器設定（僅導師可見） -->
+        <div id="teacher-countdown-config" style="margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--c-border);">
+          <div class="teacher-panel-title">倒數計時器設定</div>
+          <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+            <div class="form-group">
+              <label class="form-label" for="countdown-title-input">活動名稱</label>
+              <input type="text" id="countdown-title-input" placeholder="例如：第一次段考" maxlength="15">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="countdown-date-input">活動日期</label>
+              <input type="date" id="countdown-date-input">
+            </div>
+          </div>
+          <div style="display: flex; justify-content: flex-end;">
+            <button class="btn btn-primary btn-sm" id="btn-save-countdown" onclick="saveCountdownConfig()">儲存倒數設定</button>
+          </div>
+        </div>
       </div>
 
       <!-- 幹部/小老師個人發布歷史紀錄 -->
@@ -1221,6 +1341,12 @@ function setRolePageDate() {
   if (monthEl) monthEl.textContent = monthStr;
   if (dayEl) dayEl.textContent = dayStr;
   if (dayOfWeekEl) dayOfWeekEl.textContent = dayOfWeekStr;
+
+  // 渲染今日課表
+  renderTodayTimetable(now.getDay());
+
+  // 載入倒數計時器
+  initCountdownBanner();
 }
 
 
@@ -1339,7 +1465,8 @@ async function verifyRolePin() {
   document.getElementById('pin-error').textContent = '';
 
   try {
-    const correctPin = await fetchConfigPin();
+    const config = await fetchConfig();
+    const correctPin = config['pin'];
     if (pin === String(correctPin)) {
       APP.verifiedPin = true;
       APP.verifiedPinVal = pin; // 暫存驗證過的 PIN 碼
@@ -1358,39 +1485,50 @@ async function verifyRolePin() {
   }
 }
 
-async function fetchConfigPin() {
-  const url = `https://docs.google.com/spreadsheets/d/${CONFIG.SPREADSHEET_ID}/gviz/tq?tqx=out:json&sheet=config&nocache=${Date.now()}`;
-  const res = await fetch(url);
-  const text = await res.text();
-  const match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/);
-  if (!match) throw new Error('無法解析 config 工作表');
-  const data = JSON.parse(match[1]);
-  const rows = data.table?.rows || [];
+let CONFIG_CACHE = null;
 
-  // 1. 標準做法：尋找第一欄為 'pin' 的那一列，取第二欄的值
-  for (const row of rows) {
-    const cells = row.c || [];
-    if (cells[0]?.v && String(cells[0].v).toLowerCase().trim() === 'pin') {
-      return String(cells[1]?.v ?? '').trim();
+async function fetchConfig() {
+  if (CONFIG_CACHE) return CONFIG_CACHE;
+  try {
+    const url = `https://docs.google.com/spreadsheets/d/${CONFIG.SPREADSHEET_ID}/gviz/tq?tqx=out:json&sheet=config&nocache=${Date.now()}`;
+    const res = await fetch(url);
+    const text = await res.text();
+    const match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/);
+    if (!match) throw new Error('無法解析 config 工作表');
+    const data = JSON.parse(match[1]);
+    const rows = data.table?.rows || [];
+
+    const config = {};
+    rows.forEach(row => {
+      const cells = row.c || [];
+      if (cells[0]?.v !== null && cells[0]?.v !== undefined) {
+        const key = String(cells[0].v).toLowerCase().trim();
+        const val = cells[1]?.v !== null && cells[1]?.v !== undefined ? String(cells[1].v).trim() : '';
+        config[key] = val;
+      }
+    });
+
+    // 容錯備份一：如果 A1 有值但沒填 key
+    if (rows.length > 0 && !config['pin']) {
+      const firstRowCells = rows[0]?.c || [];
+      const val1 = firstRowCells[0]?.v;
+      if (val1 !== null && val1 !== undefined && val1 !== '') {
+        config['pin'] = String(val1).trim();
+      }
     }
-  }
 
-  // 2. 容錯備份一：如果使用者直接把 PIN 碼打在 A1 儲存格（或者整個工作表的第一格）
-  if (rows.length > 0) {
-    const firstRowCells = rows[0]?.c || [];
-    const val1 = firstRowCells[0]?.v;
-    if (val1 !== null && val1 !== undefined && val1 !== '') {
-      return String(val1).trim();
+    // 容錯備份二：如果是 header
+    const cols = data.table?.cols || [];
+    if (cols[0]?.label && cols[0].label !== 'key' && !config['pin']) {
+      config['pin'] = String(cols[0].label).trim();
     }
-  }
 
-  // 3. 容錯備份二：如果 Google 試算表將第一列當作標頭（header），而 A1 就是密碼
-  const cols = data.table?.cols || [];
-  if (cols[0]?.label && cols[0].label !== 'key') {
-    return String(cols[0].label).trim();
+    CONFIG_CACHE = config;
+    return config;
+  } catch (e) {
+    console.error('fetchConfig error:', e);
+    throw e;
   }
-
-  throw new Error('config 工作表無任何設定值');
 }
 
 function proceedFromRole() {
@@ -2365,6 +2503,138 @@ function clearAutosaveDraft() {
   try {
     localStorage.removeItem(getDraftKey());
   } catch (e) {}
+}
+
+// ═══════════════════════════════════════════════════════
+//  今日課表與倒數計時器邏輯
+// ═══════════════════════════════════════════════════════
+const TIMETABLE_DATA = {
+  1: ['國文', '英文', '數學', '物理', '化學', '歷史', '班會', '社團'],
+  2: ['數學', '數學', '英文', '體育', '國文', '地科', '公民', '自主學習'],
+  3: ['物理', '化學', '生物', '國文', '英文', '數學', '美術', '探究'],
+  4: ['英文', '國文', '數學', '歷史', '地理', '音樂', '體育', '本土語文'],
+  5: ['自主學習', '自主學習', '國文', '英文', '數學', '物理', '化學', '地科']
+};
+
+function renderTodayTimetable(dayNum) {
+  const titleEl = document.getElementById('timetable-title');
+  const gridEl = document.getElementById('timetable-grid');
+  if (!titleEl || !gridEl) return;
+
+  const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+  const dayName = weekdays[dayNum];
+  titleEl.textContent = `今日課表 (週${dayName})`;
+
+  gridEl.innerHTML = '';
+
+  // 週末休息 (0 = 日, 6 = 六)
+  if (dayNum === 0 || dayNum === 6) {
+    gridEl.innerHTML = '<div class="timetable-weekend" style="grid-column: 1 / -1;">今日休息，週末愉快！</div>';
+    return;
+  }
+
+  const periods = TIMETABLE_DATA[dayNum] || [];
+  periods.forEach((subject, index) => {
+    const periodBox = document.createElement('div');
+    periodBox.className = 'timetable-period';
+    periodBox.innerHTML = `
+      <span class="period-num">${index + 1}</span>
+      <span class="period-name">${subject}</span>
+    `;
+    gridEl.appendChild(periodBox);
+  });
+}
+
+async function initCountdownBanner() {
+  const banner = document.getElementById('role-countdown-banner');
+  const textEl = document.getElementById('role-countdown-text');
+  if (!banner || !textEl) return;
+
+  try {
+    const config = await fetchConfig();
+    const title = config['countdown_title'];
+    const dateStr = config['countdown_date'];
+
+    if (!title || !dateStr) {
+      banner.classList.add('hidden');
+      return;
+    }
+
+    const targetDate = new Date(dateStr);
+    targetDate.setHours(0,0,0,0);
+    const today = new Date();
+    today.setHours(0,0,0,0);
+
+    const timeDiff = targetDate.getTime() - today.getTime();
+    const daysLeft = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
+
+    if (daysLeft >= 0) {
+      textEl.textContent = `距離 ${title} 還有 ${daysLeft} 天`;
+      banner.classList.remove('hidden');
+
+      // 如果是導師登入，順便把值填入後台設定欄位以利查看/修改
+      if (APP.adminSecret) {
+        const titleInput = document.getElementById('countdown-title-input');
+        const dateInput = document.getElementById('countdown-date-input');
+        if (titleInput) titleInput.value = title;
+        if (dateInput) dateInput.value = dateStr;
+      }
+    } else {
+      banner.classList.add('hidden');
+    }
+  } catch (e) {
+    console.warn('載入倒數計時器失敗：', e);
+    banner.classList.add('hidden');
+  }
+}
+
+async function saveCountdownConfig() {
+  const title = document.getElementById('countdown-title-input').value.trim();
+  const dateStr = document.getElementById('countdown-date-input').value;
+
+  if (!title || !dateStr) {
+    showToast('請填寫活動名稱與日期', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('btn-save-countdown');
+  btn.disabled = true;
+  btn.textContent = '儲存中…';
+
+  try {
+    const payload = {
+      action: 'updateCountdown',
+      adminSecret: APP.adminSecret,
+      title: title,
+      date: dateStr
+    };
+
+    const response = await fetch(CONFIG.WEB_APP_URL, {
+      method: 'POST',
+      mode: 'cors',
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const result = await response.json();
+    if (result.success) {
+      showToast('倒數計時器設定成功', 'success');
+      // 清除本地 config 快取以利重新讀取
+      CONFIG_CACHE = null;
+      // 重新載入首頁倒數橫幅
+      await initCountdownBanner();
+    } else {
+      showToast('儲存失敗：' + (result.error || '未知錯誤'), 'error');
+    }
+  } catch (e) {
+    showToast('連線失敗，請稍後再試', 'error');
+    console.error('Save countdown error:', e);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '儲存倒數設定';
+  }
 }
 
 // ═══════════════════════════════════════════════════════
