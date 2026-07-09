@@ -869,9 +869,31 @@
 
     <!-- 今日課表區塊 -->
     <div class="timetable-card" id="timetable-card">
-      <div class="timetable-title" id="timetable-title">今日課表 (載入中...)</div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <div class="timetable-title" id="timetable-title" style="margin-bottom: 0;">今日課表 (載入中...)</div>
+        <button class="btn btn-ghost" id="btn-toggle-weekly" onclick="toggleWeeklyTimetable()" style="font-size: 0.72rem; padding: 4px 8px; color: var(--c-primary); height: auto; min-height: 0; line-height: 1;">展開整週課表</button>
+      </div>
       <div class="timetable-grid" id="timetable-grid">
         <!-- 由 JS 動態生成 -->
+      </div>
+      
+      <!-- 整週課表摺疊收納區 -->
+      <div id="weekly-timetable-wrap" class="hidden" style="margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--c-border); overflow-x: auto;">
+        <table class="weekly-table" style="width: 100%; border-collapse: collapse; font-size: 0.75rem; text-align: center; color: var(--c-text);">
+          <thead>
+            <tr style="background: var(--c-bg); border-bottom: 1px solid var(--c-border);">
+              <th style="padding: 6px 4px; font-weight: 600;">節</th>
+              <th style="padding: 6px 4px; font-weight: 600;">一</th>
+              <th style="padding: 6px 4px; font-weight: 600;">二</th>
+              <th style="padding: 6px 4px; font-weight: 600;">三</th>
+              <th style="padding: 6px 4px; font-weight: 600;">四</th>
+              <th style="padding: 6px 4px; font-weight: 600;">五</th>
+            </tr>
+          </thead>
+          <tbody id="weekly-timetable-body">
+            <!-- 由 JS 動態生成 -->
+          </tbody>
+        </table>
       </div>
     </div>
 
@@ -2922,6 +2944,83 @@ async function renderTodayTimetable(dayNum) {
   } catch (e) {
     console.warn('背景雲端課表加載失敗，維持預設課表：', e.message);
   }
+}
+
+function toggleWeeklyTimetable() {
+  const wrap = document.getElementById('weekly-timetable-wrap');
+  const btn = document.getElementById('btn-toggle-weekly');
+  if (!wrap || !btn) return;
+
+  if (wrap.classList.contains('hidden')) {
+    wrap.classList.remove('hidden');
+    btn.textContent = '收合整週課表';
+    renderWeeklyTimetable();
+  } else {
+    wrap.classList.add('hidden');
+    btn.textContent = '展開整週課表';
+  }
+}
+
+async function renderWeeklyTimetable() {
+  const tbody = document.getElementById('weekly-timetable-body');
+  if (!tbody) return;
+
+  // 1. 優先使用快取或本地預設
+  let timetable = TIMETABLE_CACHE;
+  if (!timetable) {
+    // 嘗試拉取（可能已經有快取）
+    timetable = await fetchTimetable() || TIMETABLE_DATA;
+  }
+
+  const now = new Date();
+  const currentDay = now.getDay(); // 0 = 日, 1 = 一, ..., 6 = 六
+
+  tbody.innerHTML = '';
+  // 8堂課
+  for (let period = 0; period < 8; period++) {
+    const tr = document.createElement('tr');
+    tr.style.borderBottom = '1px solid var(--c-border)';
+    
+    // 節次欄
+    const tdNum = document.createElement('td');
+    tdNum.style.padding = '8px 4px';
+    tdNum.style.fontWeight = '600';
+    tdNum.style.color = 'var(--c-text-muted)';
+    tdNum.textContent = period + 1;
+    tr.appendChild(tdNum);
+
+    // 週一到週五
+    for (let day = 1; day <= 5; day++) {
+      const td = document.createElement('td');
+      td.style.padding = '8px 4px';
+      
+      const subject = timetable[day]?.[period] || '—';
+      td.textContent = subject;
+
+      // 如果是今天，高亮顯示該欄
+      if (day === currentDay) {
+        td.style.background = 'rgba(90, 140, 110, 0.08)';
+        td.style.color = 'var(--c-primary)';
+        td.style.fontWeight = '600';
+      }
+
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+  }
+
+  // 同時高亮 header 的星期幾
+  const headers = document.querySelectorAll('#weekly-timetable-wrap th');
+  headers.forEach((th, index) => {
+    // index 0 is '節', index 1 is '一', etc.
+    if (index === currentDay) {
+      th.style.background = 'rgba(90, 140, 110, 0.08)';
+      th.style.color = 'var(--c-primary)';
+    } else {
+      th.style.background = '';
+      th.style.color = '';
+    }
+  });
 }
 
 async function initCountdownBanner() {
