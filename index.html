@@ -717,12 +717,12 @@
     /* ── 倒數計時器樣式 ── */
     .role-countdown-banner {
       display: inline-flex; align-items: center; gap: 8px; margin-top: 14px;
-      padding: 6px 12px; background: rgba(200,134,42,0.06); border: 1px solid rgba(200,134,42,0.2);
-      border-radius: var(--radius-sm); font-size: 0.77rem; font-weight: 500; color: var(--c-quiz);
+      padding: 6px 12px; background: rgba(219,68,85,0.06); border: 1px solid rgba(219,68,85,0.22);
+      border-radius: var(--radius-sm); font-size: 0.77rem; font-weight: 500; color: #db4455;
       animation: labelPulse 2.5s infinite ease-in-out;
     }
     .countdown-tag {
-      font-weight: 600; color: #FAF8F5; background: var(--c-quiz);
+      font-weight: 600; color: #FAF8F5; background: #db4455;
       padding: 2px 8px; border-radius: 2px; font-size: 0.68rem; letter-spacing: 0.05em;
     }
 
@@ -1009,13 +1009,11 @@
 
       <!-- 導師管理說明 -->
       <div class="teacher-panel hidden" id="teacher-panel">
-        <div class="teacher-panel-title">⚙️ 導師管理公告</div>
-        <div class="teacher-panel-desc">若需要隱藏已發布的公告，請直接在 Google 試算表操作：</div>
-        <ol class="teacher-panel-steps">
-          <li>點擊下方連結開啟試算表</li>
-          <li>找到要隱藏的公告所在列</li>
-          <li>在最右側「狀態」欄位填入「<strong>隱藏</strong>」</li>
-          <li>回到佈告欄重新整理即可</li>
+        <div class="teacher-panel-title">導師管理說明</div>
+        <div class="teacher-panel-desc">如需進行進階管理，請直接開啟 Google 試算表操作：</div>
+        <ol class="teacher-panel-steps" style="margin-bottom: 18px;">
+          <li><strong>隱藏公告</strong>：於「表單回覆 2」工作表中，將欲隱藏公告之最右側「狀態」欄位填入「<strong>隱藏</strong>」。</li>
+          <li><strong>修改今日課表</strong>：於試算表中新增一個名為「<strong>timetable</strong>」的工作表。第一欄 A 代表節次，第二欄 B 至第六欄 F 分別為星期一至星期五的課程。第一列為第 1 節，依此類推共 8 列。網頁會自動讀取並顯示。</li>
         </ol>
         <a id="teacher-sheet-link" href="#" target="_blank" class="btn btn-ghost btn-sm">開啟 Google 試算表管理</a>
 
@@ -1222,8 +1220,19 @@ window.addEventListener('DOMContentLoaded', () => {
     hideLoading();
 
     if (saved.role === 'viewer') {
-      loadBoard();
-      initMarqueeData();
+      Promise.all([
+        fetchBulletins(),
+        fetchConfig()
+      ]).then(() => {
+        loadBoard();
+        initMarqueeData();
+        hideLoading();
+      }).catch(err => {
+        console.error('載入失敗：', err);
+        loadBoard();
+        initMarqueeData();
+        hideLoading();
+      });
     } else if (saved.role === 'editor' && saved.verifiedPin) {
       showPage('edit');
       setEditorDefaultDate();
@@ -1235,16 +1244,37 @@ window.addEventListener('DOMContentLoaded', () => {
       initEditorPanel();
     } else {
       showPage('role');
-      initMarqueeData();
-      setRolePageDate();
+      Promise.all([
+        fetchBulletins(),
+        fetchConfig(),
+        fetchTimetable()
+      ]).then(() => {
+        initMarqueeData();
+        setRolePageDate();
+        hideLoading();
+      }).catch(() => {
+        initMarqueeData();
+        setRolePageDate();
+        hideLoading();
+      });
     }
     return;
   }
 
   showPage('role');
-  hideLoading();
-  initMarqueeData();
-  setRolePageDate();
+  Promise.all([
+    fetchBulletins(),
+    fetchConfig(),
+    fetchTimetable()
+  ]).then(() => {
+    initMarqueeData();
+    setRolePageDate();
+    hideLoading();
+  }).catch(() => {
+    initMarqueeData();
+    setRolePageDate();
+    hideLoading();
+  });
 });
 
 function populateRoleSelects() {
@@ -1591,15 +1621,19 @@ function proceedFromRole() {
 // ═══════════════════════════════════════════════════════
 //  讀取公告（Google Sheets gviz API）
 // ═══════════════════════════════════════════════════════
-async function loadBoard() {
+async function loadBoard(forceRefresh = false) {
   showPage('board');
   updateHeader();
   const now = new Date();
   document.getElementById('board-date').textContent = `${now.getFullYear()} 年 ${now.getMonth()+1} 月 ${now.getDate()} 日`;
-  document.getElementById('bulletin-list').innerHTML = `<div style="text-align:center;padding:48px;color:var(--c-text-dim)"><div class="spinner" style="margin:0 auto 16px;"></div>讀取中…</div>`;
+
+  const hasCache = !!BULLETINS_CACHE;
+  if (forceRefresh || !hasCache) {
+    document.getElementById('bulletin-list').innerHTML = `<div style="text-align:center;padding:48px;color:var(--c-text-dim)"><div class="spinner" style="margin:0 auto 16px;"></div>讀取中…</div>`;
+  }
 
   try {
-    const bulletins = await fetchBulletins();
+    const bulletins = await fetchBulletins(forceRefresh);
     APP.allBulletins = bulletins;
     
     // 更新今日速覽儀表板
@@ -1662,7 +1696,13 @@ function isTomorrow(dateStr) {
   return tomorrow.getTime() === d.getTime();
 }
 
-async function fetchBulletins() {
+let BULLETINS_CACHE = null;
+
+async function fetchBulletins(forceRefresh = false) {
+  if (BULLETINS_CACHE && !forceRefresh) {
+    return BULLETINS_CACHE;
+  }
+
   const url = `https://docs.google.com/spreadsheets/d/${CONFIG.SPREADSHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(CONFIG.RESPONSE_SHEET)}&nocache=${Date.now()}`;
   const res = await fetch(url);
   const text = await res.text();
@@ -1681,7 +1721,7 @@ async function fetchBulletins() {
   const rows = data.table.rows || [];
   // 欄位順序（Google Form 回應表）：
   // 0:Timestamp 1:類別 2:科目 3:截止日期 4:內容 5:發布者 6:角色 7:狀態
-  return rows.map((row, i) => {
+  const list = rows.map((row, i) => {
     const c = row.c || [];
     const getVal = (idx) => {
       const cell = c[idx];
@@ -1719,6 +1759,9 @@ async function fetchBulletins() {
   })
   .filter(b => b.content && b.status !== '隱藏')
   .reverse(); // 最新的排最前
+
+  BULLETINS_CACHE = list;
+  return list;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -2805,7 +2848,48 @@ const TIMETABLE_DATA = {
   5: ['自主學習', '自主學習', '國文', '英文', '數學', '物理', '化學', '地科']
 };
 
-function renderTodayTimetable(dayNum) {
+let TIMETABLE_CACHE = null;
+
+async function fetchTimetable() {
+  if (TIMETABLE_CACHE) return TIMETABLE_CACHE;
+  try {
+    const url = `https://docs.google.com/spreadsheets/d/${CONFIG.SPREADSHEET_ID}/gviz/tq?tqx=out:json&sheet=timetable&nocache=${Date.now()}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('無法讀取試算表中的課表分頁');
+    const text = await res.text();
+    const match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/);
+    if (!match) throw new Error('無法解析課表資料');
+    
+    const data = JSON.parse(match[1]);
+    const rows = data.table?.rows || [];
+
+    const timetable = {
+      1: [], 2: [], 3: [], 4: [], 5: []
+    };
+
+    rows.forEach(row => {
+      const cells = row.c || [];
+      for (let day = 1; day <= 5; day++) {
+        const val = cells[day]?.v !== null && cells[day]?.v !== undefined ? String(cells[day].v).trim() : '—';
+        timetable[day].push(val);
+      }
+    });
+
+    for (let day = 1; day <= 5; day++) {
+      while (timetable[day].length < 8) {
+        timetable[day].push('—');
+      }
+    }
+
+    TIMETABLE_CACHE = timetable;
+    return timetable;
+  } catch (e) {
+    console.warn('雲端課表加載失敗，採用系統預設課表：', e.message);
+    return null;
+  }
+}
+
+async function renderTodayTimetable(dayNum) {
   const titleEl = document.getElementById('timetable-title');
   const gridEl = document.getElementById('timetable-grid');
   if (!titleEl || !gridEl) return;
@@ -2816,13 +2900,17 @@ function renderTodayTimetable(dayNum) {
 
   gridEl.innerHTML = '';
 
-  // 週末休息 (0 = 日, 6 = 六)
   if (dayNum === 0 || dayNum === 6) {
     gridEl.innerHTML = '<div class="timetable-weekend" style="grid-column: 1 / -1;">今日休息，週末愉快！</div>';
     return;
   }
 
-  const periods = TIMETABLE_DATA[dayNum] || [];
+  let timetable = await fetchTimetable();
+  if (!timetable) {
+    timetable = TIMETABLE_DATA;
+  }
+
+  const periods = timetable[dayNum] || [];
   periods.forEach((subject, index) => {
     const periodBox = document.createElement('div');
     periodBox.className = 'timetable-period';
