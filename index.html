@@ -1187,28 +1187,18 @@ async function initMarqueeData() {
         marqueeTextEl.textContent = text;
         marqueeContainerEl.classList.remove('hidden');
         
-        // 修正：如果公告字數過短，直接置中顯示不滾動，減少視覺干擾
-        if (text.length < 35) {
-          marqueeTextEl.style.animation = 'none';
-          marqueeTextEl.style.position = 'relative';
-          marqueeTextEl.style.paddingLeft = '0';
-          marqueeTextEl.style.display = 'block';
-          marqueeTextEl.style.textAlign = 'center';
-          marqueeTextEl.style.width = '100%';
-        } else {
-          // 還原跑馬燈滾動動畫設定
-          marqueeTextEl.style.animation = '';
-          marqueeTextEl.style.position = '';
-          marqueeTextEl.style.paddingLeft = '';
-          marqueeTextEl.style.display = '';
-          marqueeTextEl.style.textAlign = '';
-          marqueeTextEl.style.width = '';
-          
-          const speed = 40;
-          const textWidth = marqueeTextEl.offsetWidth || (text.length * 14);
-          const duration = Math.max(12, textWidth / speed);
-          marqueeTextEl.style.animationDuration = `${duration}s`;
-        }
+        // 還原跑馬燈滾動動畫設定
+        marqueeTextEl.style.animation = '';
+        marqueeTextEl.style.position = '';
+        marqueeTextEl.style.paddingLeft = '';
+        marqueeTextEl.style.display = '';
+        marqueeTextEl.style.textAlign = '';
+        marqueeTextEl.style.width = '';
+        
+        const speed = 40;
+        const textWidth = marqueeTextEl.offsetWidth || (text.length * 14);
+        const duration = Math.max(12, textWidth / speed);
+        marqueeTextEl.style.animationDuration = `${duration}s`;
       }
     }
   } catch (e) {
