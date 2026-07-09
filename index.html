@@ -514,6 +514,174 @@
       .section-title { font-size: 1.55rem; }
       .role-header h1 { font-size: 1.9rem; }
     }
+
+    /* ── 今日儀表板 ── */
+    .dashboard-box {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px;
+      background: rgba(26,93,87,0.03); border: 1.5px solid var(--c-border);
+      border-radius: var(--radius-lg); padding: 16px; box-shadow: var(--shadow-sm);
+    }
+    .dashboard-item {
+      text-align: center; display: flex; flex-direction: column; gap: 4px; justify-content: center;
+    }
+    .dashboard-item:not(:first-child) {
+      border-left: 1px solid var(--c-border);
+    }
+    .dashboard-label {
+      font-size: 0.72rem; color: var(--c-text-muted); font-weight: 600; letter-spacing: 0.04em;
+    }
+    .dashboard-value {
+      font-size: 1.45rem; font-weight: 700;
+    }
+    .val-hw { color: var(--c-hw); }
+    .val-quiz { color: var(--c-quiz); }
+    .val-note { color: var(--c-note); }
+    .val-admin { color: var(--c-admin); }
+
+    /* ── 月曆視圖 ── */
+    .calendar-container {
+      background: var(--c-surface); border: 1.5px solid var(--c-border);
+      border-radius: var(--radius-lg); padding: 18px; margin-bottom: 20px;
+      box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 14px;
+    }
+    .calendar-header {
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .calendar-month-title {
+      font-family: 'Noto Serif TC', serif; font-size: 1.15rem; font-weight: 600; color: var(--c-text);
+    }
+    .calendar-grid {
+      display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px;
+    }
+    .calendar-day-header {
+      text-align: center; font-size: 0.72rem; font-weight: 600; color: var(--c-text-muted);
+      padding: 6px 0; border-bottom: 1.5px solid var(--c-border); letter-spacing: 0.04em;
+    }
+    .calendar-day {
+      min-height: 86px; border: 1px solid var(--c-border); border-radius: var(--radius-sm);
+      padding: 6px; display: flex; flex-direction: column; gap: 4px; transition: var(--transition);
+      cursor: pointer; background: var(--c-surface);
+    }
+    .calendar-day:hover {
+      border-color: var(--c-primary); background: var(--c-primary-dim);
+    }
+    .calendar-day.other-month {
+      background: var(--c-bg); color: var(--c-text-dim); opacity: 0.55; cursor: not-allowed;
+    }
+    .calendar-day.other-month:hover { border-color: var(--c-border); background: var(--c-bg); }
+    .calendar-day.today {
+      border-color: var(--c-primary); background: rgba(26,93,87,0.04);
+    }
+    .calendar-day.today .calendar-day-num {
+      color: var(--c-primary); font-weight: 700;
+    }
+    .calendar-day-num {
+      font-size: 0.76rem; font-weight: 500; color: var(--c-text-muted);
+    }
+    .calendar-day-events {
+      display: flex; flex-direction: column; gap: 3px; flex: 1; overflow: hidden;
+    }
+    .calendar-event-tag {
+      font-size: 0.65rem; padding: 2px 4px; border-radius: 2px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      font-weight: 500; letter-spacing: 0.02em; text-align: center;
+    }
+    .cal-tag-hw   { background: var(--c-hw-dim);   color: var(--c-hw); }
+    .cal-tag-quiz { background: var(--c-quiz-dim); color: var(--c-quiz); }
+    .cal-tag-note { background: var(--c-note-dim); color: var(--c-note); }
+    .cal-tag-admin { background: var(--c-admin-dim); color: var(--c-admin); }
+    .calendar-more-badge {
+      font-size: 0.62rem; color: var(--c-text-dim); text-align: right; font-weight: 500; margin-top: auto;
+    }
+    .calendar-dot-bar {
+      display: none; gap: 3px; justify-content: center; margin-top: auto;
+    }
+    .calendar-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+    }
+    .dot-hw { background: var(--c-hw); }
+    .dot-quiz { background: var(--c-quiz); }
+    .dot-note { background: var(--c-note); }
+    .dot-admin { background: var(--c-admin); }
+
+    /* ── Modal 彈出視窗 ── */
+    .modal {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(36,50,49,0.48); backdrop-filter: blur(4px);
+      z-index: 1000; display: flex; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none; transition: opacity 0.2s ease;
+    }
+    .modal.show {
+      opacity: 1; pointer-events: all;
+    }
+    .modal-content {
+      background: var(--c-surface); border-radius: var(--radius-lg);
+      width: 90%; max-width: 500px; max-height: 80vh; overflow-y: auto;
+      box-shadow: var(--shadow-lg); border: 1.5px solid var(--c-border);
+      animation: modalIn 0.22s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    @keyframes modalIn { from { transform: scale(0.96); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    .modal-header {
+      padding: 16px 20px; border-bottom: 1px solid var(--c-border);
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; background: var(--c-surface); z-index: 10;
+    }
+    .modal-header h3 {
+      font-family: 'Noto Serif TC', serif; font-size: 1.1rem; color: var(--c-text);
+    }
+    .modal-close {
+      background: none; border: none; font-size: 1.6rem; color: var(--c-text-dim);
+      cursor: pointer; line-height: 1; transition: var(--transition);
+    }
+    .modal-close:hover { color: var(--c-danger); }
+    .modal-body {
+      padding: 20px; display: flex; flex-direction: column; gap: 14px;
+    }
+
+    /* ── 發布歷史紀錄樣式 ── */
+    .history-item {
+      background: var(--c-surface); border: 1px solid var(--c-border);
+      border-radius: var(--radius-md); padding: 12px 14px;
+      display: flex; flex-direction: column; gap: 8px; transition: var(--transition);
+    }
+    .history-item:hover { border-color: var(--c-primary); }
+    .history-meta { display: flex; align-items: center; gap: 6px; }
+    .history-content { font-size: 0.8rem; color: var(--c-text-muted); line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .history-btns { display: flex; gap: 6px; justify-content: flex-end; }
+
+    @media (max-width: 479px) {
+      .calendar-day {
+        min-height: 52px; padding: 4px;
+      }
+      .calendar-day-events {
+        display: none;
+      }
+      .calendar-dot-bar {
+        display: flex;
+      }
+      .calendar-more-badge {
+        display: none;
+      }
+      .dashboard-box {
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        padding: 12px;
+      }
+      .dashboard-item:nth-child(even) {
+        border-left: none;
+      }
+      .dashboard-item:nth-child(3), .dashboard-item:nth-child(4) {
+        margin-top: 4px;
+        padding-top: 4px;
+        border-top: 1px solid var(--c-border);
+      }
+      .dashboard-item:nth-child(3) {
+        border-left: none;
+      }
+      .dashboard-item:nth-child(4) {
+        border-left: 1px solid var(--c-border);
+      }
+    }
   </style>
 </head>
 <body>
@@ -568,7 +736,7 @@
     <div class="role-cards">
       <div class="role-card" id="role-card-viewer" tabindex="0" role="button" onclick="selectRoleCard('viewer')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectRoleCard('viewer')}">
         <span class="role-card-icon">📖</span>
-        <div class="role-card-name"><span class="role-name-student">學生</span><br><span class="role-name-parent">家長</span></div>
+        <div class="role-card-name"><span class="role-name-student">學生</span> / <span class="role-name-parent">家長</span></div>
         <div class="role-card-desc">瀏覽作業、小考、老師交代事項與學校行政公告</div>
       </div>
       <div class="role-card" id="role-card-cadre" tabindex="0" role="button" onclick="selectRoleCard('cadre')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectRoleCard('cadre')}">
@@ -627,21 +795,51 @@
       <button class="btn btn-ghost btn-sm" onclick="loadBoard()">重新整理</button>
     </div>
 
-    <!-- 統計資訊面版 (僅管理員可見) -->
-    <div id="admin-stats-box" class="hidden" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; background: rgba(92,77,67,0.05); border: 1.5px solid var(--c-border); border-radius: var(--radius-md); padding: 12px 16px;">
-      <div style="text-align: center;"><div style="font-size: 0.75rem; color: var(--c-text-muted); font-weight: 500;">作業總數</div><div id="stat-hw" style="font-size: 1.3rem; font-weight: 600; color: var(--c-hw);">0</div></div>
-      <div style="text-align: center; border-left: 1px solid var(--c-border);"><div style="font-size: 0.75rem; color: var(--c-text-muted); font-weight: 500;">小考總數</div><div id="stat-quiz" style="font-size: 1.3rem; font-weight: 600; color: var(--c-quiz);">0</div></div>
-      <div style="text-align: center; border-left: 1px solid var(--c-border); border-right: 1px solid var(--c-border);"><div style="font-size: 0.75rem; color: var(--c-text-muted); font-weight: 500;">老師交代</div><div id="stat-note" style="font-size: 1.3rem; font-weight: 600; color: var(--c-note);">0</div></div>
-      <div style="text-align: center;"><div style="font-size: 0.75rem; color: var(--c-text-muted); font-weight: 500;">行政公告</div><div id="stat-admin" style="font-size: 1.3rem; font-weight: 600; color: var(--c-admin);">0</div></div>
+    <!-- 今日速覽儀表板 -->
+    <div id="dashboard-box" class="dashboard-box">
+      <div class="dashboard-item">
+        <span class="dashboard-label">今日作業</span>
+        <span class="dashboard-value val-hw" id="dash-hw">0</span>
+      </div>
+      <div class="dashboard-item">
+        <span class="dashboard-label">明日小考</span>
+        <span class="dashboard-value val-quiz" id="dash-quiz">0</span>
+      </div>
+      <div class="dashboard-item">
+        <span class="dashboard-label">老師交代</span>
+        <span class="dashboard-value val-note" id="dash-note">0</span>
+      </div>
+      <div class="dashboard-item">
+        <span class="dashboard-label">行政公告</span>
+        <span class="dashboard-value val-admin" id="dash-admin">0</span>
+      </div>
     </div>
 
-    <div class="filter-bar">
-      <div class="filter-chip active-all" data-filter="all" onclick="setFilter('all')">全部</div>
-      <div class="filter-chip" data-filter="作業" onclick="setFilter('作業')">作業</div>
-      <div class="filter-chip" data-filter="小考" onclick="setFilter('小考')">小考</div>
-      <div class="filter-chip" data-filter="老師交代事項" onclick="setFilter('老師交代事項')">老師交代事項</div>
-      <div class="filter-chip" data-filter="學校行政公告" onclick="setFilter('學校行政公告')">學校行政公告</div>
-      <div class="filter-chip" data-filter="expired" onclick="setFilter('expired')">已過期</div>
+    <div class="filter-bar" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+      <div style="display: flex; gap: 8px; flex-wrap: wrap; flex: 1;">
+        <div class="filter-chip active-all" data-filter="all" onclick="setFilter('all')">全部</div>
+        <div class="filter-chip" data-filter="作業" onclick="setFilter('作業')">作業</div>
+        <div class="filter-chip" data-filter="小考" onclick="setFilter('小考')">小考</div>
+        <div class="filter-chip" data-filter="老師交代事項" onclick="setFilter('老師交代事項')">老師交代事項</div>
+        <div class="filter-chip" data-filter="學校行政公告" onclick="setFilter('學校行政公告')">學校行政公告</div>
+        <div class="filter-chip" data-filter="expired" onclick="setFilter('expired')">已過期</div>
+      </div>
+      <div style="display: flex; gap: 6px; margin-left: 12px;" id="view-toggle-wrap">
+        <button class="filter-chip active-all" id="btn-view-list" onclick="switchView('list')">列表檢視</button>
+        <button class="filter-chip" id="btn-view-calendar" onclick="switchView('calendar')">月曆檢視</button>
+      </div>
+    </div>
+
+    <!-- 月曆視圖容器 -->
+    <div id="calendar-view" class="calendar-container hidden">
+      <div class="calendar-header">
+        <button class="btn btn-ghost btn-sm" onclick="changeMonth(-1)">◀ 上個月</button>
+        <span class="calendar-month-title" id="calendar-month-title">-- 年 -- 月</span>
+        <button class="btn btn-ghost btn-sm" onclick="changeMonth(1)">下個月 ▶</button>
+      </div>
+      <div class="calendar-grid" id="calendar-grid">
+        <!-- 由 JS 動態生成 -->
+      </div>
     </div>
 
     <div id="bulletin-list"></div>
@@ -716,6 +914,13 @@
         </ol>
         <a id="teacher-sheet-link" href="#" target="_blank" class="btn btn-ghost btn-sm">開啟 Google 試算表管理</a>
       </div>
+
+      <!-- 幹部/小老師個人發布歷史紀錄 -->
+      <div class="editor-card hidden" id="editor-history-card" style="margin-top: 24px;">
+        <div class="editor-card-title">發布歷史紀錄</div>
+        <div class="editor-card-desc">您發布過的公告，可在此直接編輯內容或將其隱藏</div>
+        <div id="editor-history-list"></div>
+      </div>
     </div>
   </div>
 
@@ -726,6 +931,19 @@
 
 <!-- 隱藏 iframe（用於 Google Form 提交） -->
 <iframe name="hidden-submit-frame" style="display:none;" title="submit"></iframe>
+
+<!-- 月曆詳細資訊 Modal -->
+<div id="calendar-modal" class="modal" onclick="if(event.target===this) closeCalendarModal()">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3 id="calendar-modal-title">日期公告</h3>
+      <button class="modal-close" onclick="closeCalendarModal()">&times;</button>
+    </div>
+    <div class="modal-body" id="calendar-modal-body">
+      <!-- 由 JS 動態生成 -->
+    </div>
+  </div>
+</div>
 
 <script>
 // ═══════════════════════════════════════════════════════
@@ -754,15 +972,21 @@ const CONFIG = {
 //  App 狀態
 // ═══════════════════════════════════════════════════════
 const APP = {
-  role:         null,   // 'viewer' | 'editor'
-  posterType:   null,   // 'viewer' | 'cadre' | 'teacher'
-  posterLabel:  '',
+  role:          null,   // 'viewer' | 'editor'
+  posterType:    null,   // 'viewer' | 'cadre' | 'teacher'
+  posterLabel:   '',
   posterSubject: '',
-  verifiedPin:  false,
-  allBulletins: [],
-  activeFilter: 'all',
-  isSubmitting: false,
-  adminSecret:  null    // 儲存管理員金鑰
+  verifiedPin:   false,
+  allBulletins:  [],
+  activeFilter:  'all',
+  isSubmitting:  false,
+  adminSecret:   null,   // 儲存管理員金鑰
+  currentView:   'list', // 'list' | 'calendar'
+  currentYear:   new Date().getFullYear(),
+  currentMonth:  new Date().getMonth(), // 0 = 1月, 11 = 12月
+  isEditing:     false,  // 是否處於編輯舊公告狀態
+  editingTimestamp: null, // 被編輯公告的時間戳記
+  verifiedPinVal: null   // 暫存驗證過的 PIN 碼用於後續編輯與隱藏驗證
 };
 
 // ═══════════════════════════════════════════════════════
@@ -775,7 +999,8 @@ function saveRole() {
     localStorage.setItem(ROLE_STORAGE_KEY, JSON.stringify({
       role: APP.role, posterType: APP.posterType,
       posterLabel: APP.posterLabel, posterSubject: APP.posterSubject,
-      verifiedPin: APP.verifiedPin
+      verifiedPin: APP.verifiedPin,
+      verifiedPinVal: APP.verifiedPinVal
     }));
   } catch (e) { /* localStorage 不可用 */ }
 }
@@ -839,6 +1064,7 @@ window.addEventListener('DOMContentLoaded', () => {
     APP.posterLabel = saved.posterLabel || '';
     APP.posterSubject = saved.posterSubject || '';
     APP.verifiedPin = saved.verifiedPin || false;
+    APP.verifiedPinVal = saved.verifiedPinVal || null;
     updateHeader();
     hideLoading();
 
@@ -852,6 +1078,8 @@ window.addEventListener('DOMContentLoaded', () => {
       document.getElementById('selected-poster-text').textContent = APP.posterLabel;
       document.getElementById('editor-verified-label').textContent = APP.posterLabel;
       document.getElementById('poster-display-name').textContent = APP.posterLabel;
+      
+      initEditorPanel();
     } else {
       showPage('role');
       initMarqueeData();
@@ -948,18 +1176,39 @@ async function initMarqueeData() {
     });
     
     if (activeAnnouncements.length > 0) {
-      const text = activeAnnouncements.map(b => `【${b.category} / ${b.subject || '一般'}】${b.content}`).join('　　★　　');
+      const text = activeAnnouncements.map(b => {
+        const cleanCat = b.category.replace(/[【】]/g, '').trim();
+        return `【${cleanCat} / ${b.subject || '一般'}】${b.content}`;
+      }).join('　　★　　');
+      
       const marqueeTextEl = document.getElementById('role-marquee-text');
       const marqueeContainerEl = document.getElementById('role-marquee-container');
       if (marqueeTextEl && marqueeContainerEl) {
         marqueeTextEl.textContent = text;
         marqueeContainerEl.classList.remove('hidden');
         
-        // 根據文字寬度，動態調整跑馬燈的播放時間
-        const speed = 40;
-        const textWidth = marqueeTextEl.offsetWidth || (text.length * 14);
-        const duration = Math.max(12, textWidth / speed);
-        marqueeTextEl.style.animationDuration = `${duration}s`;
+        // 修正：如果公告字數過短，直接置中顯示不滾動，減少視覺干擾
+        if (text.length < 35) {
+          marqueeTextEl.style.animation = 'none';
+          marqueeTextEl.style.position = 'relative';
+          marqueeTextEl.style.paddingLeft = '0';
+          marqueeTextEl.style.display = 'block';
+          marqueeTextEl.style.textAlign = 'center';
+          marqueeTextEl.style.width = '100%';
+        } else {
+          // 還原跑馬燈滾動動畫設定
+          marqueeTextEl.style.animation = '';
+          marqueeTextEl.style.position = '';
+          marqueeTextEl.style.paddingLeft = '';
+          marqueeTextEl.style.display = '';
+          marqueeTextEl.style.textAlign = '';
+          marqueeTextEl.style.width = '';
+          
+          const speed = 40;
+          const textWidth = marqueeTextEl.offsetWidth || (text.length * 14);
+          const duration = Math.max(12, textWidth / speed);
+          marqueeTextEl.style.animationDuration = `${duration}s`;
+        }
       }
     }
   } catch (e) {
@@ -1103,6 +1352,7 @@ async function verifyRolePin() {
     const correctPin = await fetchConfigPin();
     if (pin === String(correctPin)) {
       APP.verifiedPin = true;
+      APP.verifiedPinVal = pin; // 暫存驗證過的 PIN 碼
       proceedFromRole();
     } else {
       document.getElementById('pin-error').textContent = '授權碼錯誤，請再試一次';
@@ -1169,6 +1419,8 @@ function proceedFromRole() {
     document.getElementById('selected-poster-text').textContent = APP.posterLabel;
     document.getElementById('editor-verified-label').textContent = APP.posterLabel;
     document.getElementById('poster-display-name').textContent = APP.posterLabel;
+    
+    initEditorPanel();
   }
 }
 
@@ -1185,11 +1437,65 @@ async function loadBoard() {
   try {
     const bulletins = await fetchBulletins();
     APP.allBulletins = bulletins;
-    renderBulletins(bulletins);
+    
+    // 更新今日速覽儀表板
+    updateDashboard(bulletins);
+    
+    // 依據目前檢視模式進行渲染
+    if (APP.currentView === 'calendar') {
+      renderCalendar();
+    } else {
+      renderBulletins(bulletins);
+    }
   } catch (e) {
     console.error('fetchBulletins error:', e);
     document.getElementById('bulletin-list').innerHTML = `<div class="empty-state"><div class="empty-state-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div><div class="empty-state-text">無法載入公告，請稍後再試<br><small style="color:var(--c-text-dim)">${e.message}</small></div></div>`;
   }
+}
+
+function updateDashboard(bulletins) {
+  let hwCount = 0;
+  let quizCount = 0;
+  let noteCount = 0;
+  let adminCount = 0;
+
+  bulletins.forEach(b => {
+    if (b.status === '隱藏') return;
+    
+    if (b.category === '作業' && isToday(b.dueDate)) {
+      hwCount++;
+    } else if (b.category === '小考' && isTomorrow(b.dueDate)) {
+      quizCount++;
+    } else if ((b.category === '老師交代事項' || b.category === '交代事項') && !isExpired(b)) {
+      noteCount++;
+    } else if (b.category === '學校行政公告' && !isExpired(b)) {
+      adminCount++;
+    }
+  });
+
+  document.getElementById('dash-hw').textContent = hwCount;
+  document.getElementById('dash-quiz').textContent = quizCount;
+  document.getElementById('dash-note').textContent = noteCount;
+  document.getElementById('dash-admin').textContent = adminCount;
+}
+
+function isToday(dateStr) {
+  if (!dateStr) return false;
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const d = new Date(dateStr);
+  d.setHours(0,0,0,0);
+  return today.getTime() === d.getTime();
+}
+
+function isTomorrow(dateStr) {
+  if (!dateStr) return false;
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(0,0,0,0);
+  const d = new Date(dateStr);
+  d.setHours(0,0,0,0);
+  return tomorrow.getTime() === d.getTime();
 }
 
 async function fetchBulletins() {
@@ -1440,6 +1746,8 @@ async function deleteAnnouncement(timestamp, event) {
     const payload = {
       action: 'updateStatus',
       adminSecret: APP.adminSecret,
+      pin: APP.verifiedPinVal,
+      posterName: APP.posterLabel,
       timestamp: timestamp,
       status: 'hidden'
     };
@@ -1523,6 +1831,12 @@ function submitBulletin() {
     return;
   }
 
+  // 檢查是否為編輯模式
+  if (APP.isEditing) {
+    submitEditedBulletin(category, subject, dueDate, content);
+    return;
+  }
+
   // 檢查 CONFIG 是否已設定
   if (CONFIG.FORM_ID === 'SETUP_REQUIRED') {
     showStatusMsg('系統尚未完成設定，請聯繫管理員', 'error');
@@ -1560,14 +1874,21 @@ function submitBulletin() {
   document.body.appendChild(hiddenForm);
   hiddenForm.submit();
 
-  // 等待約 1.5 秒後回傳成功（無法讀取 iframe 的回應，樂觀假設成功）
+  // 等待約 1.5 秒後回傳成功
   setTimeout(() => {
     document.body.removeChild(hiddenForm);
     APP.isSubmitting = false;
     btn.disabled = false; btn.textContent = '發布公告';
     showStatusMsg('公告已成功發布！公告欄將在幾分鐘內更新。', 'success');
+    
+    // 清除草稿暫存
+    clearAutosaveDraft();
+    
     resetEditorForm();
     showToast('公告發布成功', 'success');
+    
+    // 重新整理發布歷史紀錄
+    initEditorPanel();
   }, 1800);
 }
 
@@ -1618,6 +1939,442 @@ function showToast(msg, type = 'info') {
   toast.onclick = () => container.removeChild(toast);
   container.appendChild(toast);
   setTimeout(() => { if (toast.parentNode) container.removeChild(toast); }, 4000);
+}
+
+// ═══════════════════════════════════════════════════════
+//  月曆與視圖切換邏輯
+// ═══════════════════════════════════════════════════════
+function switchView(view) {
+  APP.currentView = view;
+  
+  // 切換選單的 active 樣式
+  const btnList = document.getElementById('btn-view-list');
+  const btnCalendar = document.getElementById('btn-view-calendar');
+  
+  if (view === 'calendar') {
+    btnList.classList.remove('active-all');
+    btnCalendar.classList.add('active-all');
+    document.getElementById('bulletin-list').classList.add('hidden');
+    document.getElementById('calendar-view').classList.remove('hidden');
+    renderCalendar();
+  } else {
+    btnCalendar.classList.remove('active-all');
+    btnList.classList.add('active-all');
+    document.getElementById('calendar-view').classList.add('hidden');
+    document.getElementById('bulletin-list').classList.remove('hidden');
+    renderBulletins(APP.allBulletins);
+  }
+}
+
+function changeMonth(dir) {
+  let newMonth = APP.currentMonth + dir;
+  let newYear = APP.currentYear;
+  
+  if (newMonth < 0) {
+    newMonth = 11;
+    newYear--;
+  } else if (newMonth > 11) {
+    newMonth = 0;
+    newYear++;
+  }
+  
+  APP.currentYear = newYear;
+  APP.currentMonth = newMonth;
+  renderCalendar();
+}
+
+function renderCalendar() {
+  const container = document.getElementById('calendar-grid');
+  if (!container) return;
+  
+  // 更新月曆標題
+  const titleEl = document.getElementById('calendar-month-title');
+  titleEl.textContent = `${APP.currentYear} 年 ${APP.currentMonth + 1} 月`;
+  
+  container.innerHTML = '';
+  
+  // 建立星期標頭
+  const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+  weekdays.forEach(day => {
+    const dayHeader = document.createElement('div');
+    dayHeader.className = 'calendar-day-header';
+    dayHeader.textContent = day;
+    container.appendChild(dayHeader);
+  });
+  
+  // 取得該月第一天是星期幾，以及該月總天數
+  const firstDay = new Date(APP.currentYear, APP.currentMonth, 1).getDay();
+  const totalDays = new Date(APP.currentYear, APP.currentMonth + 1, 0).getDate();
+  
+  // 取得前一個月最後幾天補齊開頭
+  const prevMonthTotalDays = new Date(APP.currentYear, APP.currentMonth, 0).getDate();
+  for (let i = firstDay - 1; i >= 0; i--) {
+    const dayBox = document.createElement('div');
+    dayBox.className = 'calendar-day other-month';
+    const num = prevMonthTotalDays - i;
+    dayBox.innerHTML = `<span class="calendar-day-num">${num}</span>`;
+    container.appendChild(dayBox);
+  }
+  
+  // 渲染當月日期
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  
+  for (let d = 1; d <= totalDays; d++) {
+    const dayBox = document.createElement('div');
+    dayBox.className = 'calendar-day';
+    
+    const curDate = new Date(APP.currentYear, APP.currentMonth, d);
+    if (curDate.getTime() === today.getTime()) {
+      dayBox.classList.add('today');
+    }
+    
+    // 找出該截止日期匹配的公告項目
+    const curYearStr = String(APP.currentYear);
+    const curMonthStr = String(APP.currentMonth + 1).padStart(2, '0');
+    const curDayStr = String(d).padStart(2, '0');
+    const dateStr = `${curYearStr}-${curMonthStr}-${curDayStr}`;
+    
+    const dayEvents = APP.allBulletins.filter(b => {
+      if (b.status === '隱藏') return false;
+      if (!b.dueDate) return false;
+      const due = new Date(b.dueDate);
+      due.setHours(0,0,0,0);
+      return due.getTime() === curDate.getTime();
+    });
+    
+    // 格式化日期數字
+    let eventsHTML = '';
+    let dotHTML = '';
+    
+    if (dayEvents.length > 0) {
+      // 桌面版顯示前 2 筆文字
+      eventsHTML = '<div class="calendar-day-events">';
+      dayEvents.slice(0, 2).forEach(b => {
+        const catMap = { '作業': 'hw', '小考': 'quiz', '交代事項': 'note', '老師交代事項': 'note', '學校行政公告': 'admin' };
+        const cls = catMap[b.category] || 'note';
+        eventsHTML += `<span class="calendar-event-tag cal-tag-${cls}">[${b.category.substring(0,2)}] ${b.subject || '一般'}</span>`;
+      });
+      
+      if (dayEvents.length > 2) {
+        eventsHTML += `<span class="calendar-more-badge">+ ${dayEvents.length - 2} 筆</span>`;
+      }
+      eventsHTML += '</div>';
+      
+      // 行動端顯示彩色圓點
+      dotHTML = '<div class="calendar-dot-bar">';
+      dayEvents.forEach(b => {
+        const catMap = { '作業': 'hw', '小考': 'quiz', '交代事項': 'note', '老師交代事項': 'note', '學校行政公告': 'admin' };
+        const cls = catMap[b.category] || 'note';
+        dotHTML += `<span class="calendar-dot dot-${cls}"></span>`;
+      });
+      dotHTML += '</div>';
+    }
+    
+    dayBox.innerHTML = `
+      <span class="calendar-day-num">${d}</span>
+      ${eventsHTML}
+      ${dotHTML}
+    `;
+    
+    // 點選日期格時，彈出 Modal 顯示該日詳細公告
+    dayBox.onclick = () => {
+      if (dayEvents.length > 0) {
+        openCalendarModal(dateStr, dayEvents);
+      }
+    };
+    
+    container.appendChild(dayBox);
+  }
+  
+  // 補齊結尾格數 (以 42 格為基準)
+  const currentTotalCells = firstDay + totalDays;
+  const remainingCells = 42 - currentTotalCells;
+  for (let i = 1; i <= remainingCells; i++) {
+    const dayBox = document.createElement('div');
+    dayBox.className = 'calendar-day other-month';
+    dayBox.innerHTML = `<span class="calendar-day-num">${i}</span>`;
+    container.appendChild(dayBox);
+  }
+}
+
+function openCalendarModal(dateStr, dayEvents) {
+  const modal = document.getElementById('calendar-modal');
+  const title = document.getElementById('calendar-modal-title');
+  const body = document.getElementById('calendar-modal-body');
+  
+  title.textContent = `${dateStr} 公告明細 (${dayEvents.length} 筆)`;
+  body.innerHTML = '';
+  
+  dayEvents.forEach(b => {
+    const catMap = { 
+      '作業': ['hw','tag-hw'], 
+      '小考': ['quiz','tag-quiz'], 
+      '交代事項': ['note','tag-note'],
+      '老師交代事項': ['note','tag-note'],
+      '學校行政公告': ['admin','tag-admin']
+    };
+    const [accentKey, tagClass] = catMap[b.category] || ['note','tag-note'];
+    
+    const eventCard = document.createElement('div');
+    eventCard.style.padding = '12px 14px';
+    eventCard.style.background = 'var(--c-bg)';
+    eventCard.style.border = '1px solid var(--c-border)';
+    eventCard.style.borderRadius = 'var(--radius-md)';
+    eventCard.style.borderLeft = `4px solid var(--c-${accentKey})`;
+    eventCard.style.marginBottom = '10px';
+    
+    eventCard.innerHTML = `
+      <div class="card-meta" style="margin-bottom: 6px; display: flex; align-items: center;">
+        <span class="tag ${tagClass}">${b.category}</span>
+        <span class="subject-tag" style="margin-left: 6px;">${b.subject || '一般'}</span>
+        <span class="card-date" style="margin-left: auto; font-size: 0.72rem; color: var(--c-text-muted);">${b.posterName || ''}</span>
+      </div>
+      <div style="font-size: 0.85rem; color: var(--c-text); white-space: pre-wrap; word-break: break-word; line-height: 1.6;">${escHtml(b.content)}</div>
+    `;
+    body.appendChild(eventCard);
+  });
+  
+  modal.classList.add('show');
+}
+
+function closeCalendarModal() {
+  document.getElementById('calendar-modal').classList.remove('show');
+}
+
+// ═══════════════════════════════════════════════════════
+//  幹部與小老師發布歷史管理、編輯與草稿暫存邏輯
+// ═══════════════════════════════════════════════════════
+async function initEditorPanel() {
+  // 1. 如果不是管理員或發布者，跳出
+  if (APP.role !== 'editor') return;
+
+  const historyCard = document.getElementById('editor-history-card');
+  if (!historyCard) return;
+
+  // 導師管理模式下不顯示個人發布歷史 (有導師試算表管理面板)
+  if (APP.adminSecret || !APP.posterLabel) {
+    historyCard.classList.add('hidden');
+    return;
+  }
+
+  // 顯示發布歷史卡片區塊
+  historyCard.classList.remove('hidden');
+
+  // 2. 註冊草稿自動存檔事件
+  registerDraftListeners();
+
+  // 3. 讀取並還原草稿（如果有暫存）
+  loadAutosaveDraft();
+
+  // 4. 讀取並渲染個人發布歷史列表
+  loadEditorHistory();
+}
+
+async function loadEditorHistory() {
+  const container = document.getElementById('editor-history-list');
+  if (!container) return;
+  container.innerHTML = '<div style="text-align:center;padding:12px;color:var(--c-text-dim)">載入中...</div>';
+
+  try {
+    // 拉取最新公告列表
+    const bulletins = await fetchBulletins();
+    APP.allBulletins = bulletins;
+
+    // 篩選出屬於該發布者的歷史公告 (依據 posterLabel)
+    const myBulletins = bulletins.filter(b => b.posterName === APP.posterLabel);
+
+    if (myBulletins.length === 0) {
+      container.innerHTML = '<div style="text-align:center;padding:16px;color:var(--c-text-dim);font-size:0.8rem;">尚無發布歷史紀錄</div>';
+      return;
+    }
+
+    container.innerHTML = '';
+    myBulletins.forEach(b => {
+      const catMap = { 
+        '作業': ['hw','tag-hw'], 
+        '小考': ['quiz','tag-quiz'], 
+        '交代事項': ['note','tag-note'],
+        '老師交代事項': ['note','tag-note'],
+        '學校行政公告': ['admin','tag-admin']
+      };
+      const [accentKey, tagClass] = catMap[b.category] || ['note','tag-note'];
+      const isHidden = b.status === '隱藏';
+
+      const item = document.createElement('div');
+      item.className = 'history-item';
+      if (isHidden) item.style.opacity = '0.55';
+
+      // 逸出內容避免 HTML 注入
+      const safeContent = escHtml(b.content);
+
+      item.innerHTML = `
+        <div class="history-meta">
+          <span class="tag ${tagClass}">${b.category}</span>
+          <span class="subject-tag">${b.subject || '一般'}</span>
+          <span style="font-size: 0.73rem; color: var(--c-text-dim); margin-left: auto;">截止日: ${b.dueDate || '無'}</span>
+          ${isHidden ? '<span style="font-size: 0.72rem; color: var(--c-danger); font-weight: 500;">[已隱藏]</span>' : ''}
+        </div>
+        <div class="history-content">${safeContent}</div>
+        <div class="history-btns">
+          <button class="btn btn-ghost btn-sm" onclick="startEditMode('${b.timestamp}', '${b.category}', '${b.subject}', '${b.dueDate}', \`${safeContent.replace(/`/g, '\\`').replace(/\n/g, '\\n')}\`)">修改內容</button>
+          ${isHidden ? '' : `<button class="btn btn-danger btn-sm" onclick="deleteAnnouncement('${b.timestamp}', event)">隱藏公告</button>`}
+        </div>
+      `;
+      container.appendChild(item);
+    });
+  } catch (e) {
+    console.error('loadEditorHistory error:', e);
+    container.innerHTML = '<div style="text-align:center;padding:12px;color:var(--c-danger);font-size:0.8rem;">無法載入發布歷史</div>';
+  }
+}
+
+function startEditMode(timestamp, category, subject, dueDate, content) {
+  APP.isEditing = true;
+  APP.editingTimestamp = timestamp;
+
+  // 更新表單 UI 標示處於編輯狀態
+  document.querySelector('.editor-card-title').textContent = '編輯公告';
+  document.getElementById('editor-verified-label').textContent = `${APP.posterLabel} (編輯模式)`;
+  
+  const submitBtn = document.getElementById('btn-submit');
+  submitBtn.textContent = '儲存修改';
+  
+  // 填入資料
+  document.getElementById('ed-category').value = category;
+  document.getElementById('ed-subject').value = subject;
+  document.getElementById('ed-date').value = dueDate;
+  
+  const contentArea = document.getElementById('ed-content');
+  contentArea.value = content;
+  
+  updateCharCount();
+
+  // 滾動表單至檢視區域
+  document.getElementById('editor-card').scrollIntoView({ behavior: 'smooth' });
+  showToast('已載入公告內容至表單，修改後請點選「儲存修改」', 'info');
+}
+
+function cancelEditMode() {
+  APP.isEditing = false;
+  APP.editingTimestamp = null;
+
+  // 還原表單 UI 樣式
+  document.querySelector('.editor-card-title').textContent = '新增公告';
+  document.getElementById('editor-verified-label').textContent = APP.posterLabel;
+  
+  const submitBtn = document.getElementById('btn-submit');
+  submitBtn.textContent = '發布公告';
+
+  resetEditorForm();
+}
+
+async function submitEditedBulletin(category, subject, dueDate, content) {
+  APP.isSubmitting = true;
+  const btn = document.getElementById('btn-submit');
+  btn.disabled = true; btn.textContent = '更新中…';
+
+  try {
+    const payload = {
+      action: 'editAnnouncement',
+      adminSecret: APP.adminSecret,
+      pin: APP.verifiedPinVal,
+      timestamp: APP.editingTimestamp,
+      category: category,
+      subject: subject,
+      dueDate: dueDate,
+      content: content,
+      posterName: APP.posterLabel
+    };
+
+    const response = await fetch(CONFIG.WEB_APP_URL, {
+      method: 'POST',
+      mode: 'cors',
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const result = await response.json();
+    if (result.success) {
+      showToast('公告更新成功', 'success');
+      showStatusMsg('公告已成功更新！', 'success');
+      
+      // 清除本機草稿暫存
+      clearAutosaveDraft();
+      
+      // 結束編輯模式並還原表單
+      cancelEditMode();
+      
+      // 重新整理發布歷史與公告清單
+      initEditorPanel();
+    } else {
+      showToast('更新失敗：' + (result.error || '未知錯誤'), 'error');
+      showStatusMsg('更新失敗：' + (result.error || '未知錯誤'), 'error');
+    }
+  } catch (e) {
+    showToast('網路連線失敗或權限不足', 'error');
+    console.error('Edit submit error:', e);
+  } finally {
+    APP.isSubmitting = false;
+    btn.disabled = false;
+    btn.textContent = '發布公告';
+  }
+}
+
+// ── 草稿暫存實作 ──
+const DRAFT_STORAGE_PREFIX = 'BULLETIN_DRAFT_';
+
+function getDraftKey() {
+  return DRAFT_STORAGE_PREFIX + (APP.posterLabel || 'default');
+}
+
+function registerDraftListeners() {
+  const fields = ['ed-category', 'ed-subject', 'ed-date', 'ed-content'];
+  fields.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.removeEventListener('input', saveAutosaveDraft);
+      el.addEventListener('input', saveAutosaveDraft);
+    }
+  });
+}
+
+function saveAutosaveDraft() {
+  if (APP.isEditing) return; // 編輯舊公告模式不寫入草稿存檔
+  try {
+    const category = document.getElementById('ed-category').value;
+    const subject  = document.getElementById('ed-subject').value;
+    const dueDate  = document.getElementById('ed-date').value;
+    const content  = document.getElementById('ed-content').value;
+    
+    localStorage.setItem(getDraftKey(), JSON.stringify({
+      category, subject, dueDate, content
+    }));
+  } catch (e) { /* localStorage 異常 */ }
+}
+
+function loadAutosaveDraft() {
+  try {
+    const raw = localStorage.getItem(getDraftKey());
+    if (!raw) return;
+    
+    const draft = JSON.parse(raw);
+    if (draft.category) document.getElementById('ed-category').value = draft.category;
+    if (draft.subject) document.getElementById('ed-subject').value = draft.subject;
+    if (draft.dueDate) document.getElementById('ed-date').value = draft.dueDate;
+    if (draft.content) {
+      document.getElementById('ed-content').value = draft.content;
+      updateCharCount();
+    }
+  } catch (e) { /* 還原草稿失敗 */ }
+}
+
+function clearAutosaveDraft() {
+  try {
+    localStorage.removeItem(getDraftKey());
+  } catch (e) {}
 }
 
 // ═══════════════════════════════════════════════════════
