@@ -867,14 +867,11 @@
       <button class="btn btn-primary" id="btn-role-continue" onclick="proceedFromRole()">進入佈告欄</button>
     </div>
 
-    <!-- 今日課表區塊 -->
+    <!-- 課表區塊 -->
     <div class="timetable-card" id="timetable-card">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-        <div class="timetable-title" id="timetable-title" style="margin-bottom: 0;">今日課表 (載入中...)</div>
-        <button class="btn btn-ghost" id="btn-toggle-weekly" onclick="toggleWeeklyTimetable()" style="font-size: 0.72rem; padding: 4px 8px; color: var(--c-primary); height: auto; min-height: 0; line-height: 1;">展開整週課表</button>
-      </div>
-      <div class="timetable-grid" id="timetable-grid">
-        <!-- 由 JS 動態生成 -->
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div class="timetable-title" id="timetable-title" style="margin-bottom: 0;">課表</div>
+        <button class="btn btn-ghost" id="btn-toggle-weekly" onclick="toggleWeeklyTimetable()" style="font-size: 0.72rem; padding: 4px 8px; color: var(--c-primary); height: auto; min-height: 0; line-height: 1;">展開課表</button>
       </div>
       
       <!-- 整週課表摺疊收納區 -->
@@ -1409,8 +1406,8 @@ function setRolePageDate() {
   if (dayEl) dayEl.textContent = dayStr;
   if (dayOfWeekEl) dayOfWeekEl.textContent = dayOfWeekStr;
 
-  // 渲染今日課表
-  renderTodayTimetable(now.getDay());
+  // 預先在背景拉取雲端課表（不阻塞開屏）
+  fetchTimetable().catch(() => {});
 
   // 載入倒數計時器
   initCountdownBanner();
@@ -2906,45 +2903,7 @@ async function fetchTimetable() {
   }
 }
 
-function renderTimetableGrid(gridEl, periods, dayNum) {
-  gridEl.innerHTML = '';
-  if (dayNum === 0 || dayNum === 6) {
-    gridEl.innerHTML = '<div class="timetable-weekend" style="grid-column: 1 / -1;">今日休息，週末愉快！</div>';
-    return;
-  }
-  periods.forEach((subject, index) => {
-    const periodBox = document.createElement('div');
-    periodBox.className = 'timetable-period';
-    periodBox.innerHTML = `
-      <span class="period-num">${index + 1}</span>
-      <span class="period-name">${subject}</span>
-    `;
-    gridEl.appendChild(periodBox);
-  });
-}
 
-async function renderTodayTimetable(dayNum) {
-  const titleEl = document.getElementById('timetable-title');
-  const gridEl = document.getElementById('timetable-grid');
-  if (!titleEl || !gridEl) return;
-
-  const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
-  const dayName = weekdays[dayNum];
-  titleEl.textContent = `今日課表 (週${dayName})`;
-
-  // 1. 立即用本地預設課表渲染（避免卡在載入中）
-  renderTimetableGrid(gridEl, TIMETABLE_DATA[dayNum] || [], dayNum);
-
-  // 2. 於背景拉取最新雲端課表，如果成功則無縫更新
-  try {
-    const timetable = await fetchTimetable();
-    if (timetable) {
-      renderTimetableGrid(gridEl, timetable[dayNum] || [], dayNum);
-    }
-  } catch (e) {
-    console.warn('背景雲端課表加載失敗，維持預設課表：', e.message);
-  }
-}
 
 function toggleWeeklyTimetable() {
   const wrap = document.getElementById('weekly-timetable-wrap');
