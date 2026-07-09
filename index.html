@@ -2637,8 +2637,10 @@ async function saveCountdownConfig() {
     const result = await response.json();
     if (result.success) {
       showToast('倒數計時器設定成功', 'success');
-      CONFIG_CACHE = null;
-      CONFIG_PROMISE = null;
+      if (!CONFIG_CACHE) CONFIG_CACHE = {};
+      CONFIG_CACHE['countdown_title'] = title;
+      CONFIG_CACHE['countdown_date'] = dateStr;
+      CONFIG_PROMISE = Promise.resolve(CONFIG_CACHE);
       await initCountdownBanner();
     } else {
       showToast('儲存失敗：' + (result.error || '未知錯誤'), 'error');
@@ -2685,8 +2687,10 @@ async function deleteCountdownConfig() {
       if (titleInput) titleInput.value = '';
       if (dateInput) dateInput.value = '';
 
-      CONFIG_CACHE = null;
-      CONFIG_PROMISE = null;
+      if (!CONFIG_CACHE) CONFIG_CACHE = {};
+      CONFIG_CACHE['countdown_title'] = '';
+      CONFIG_CACHE['countdown_date'] = '';
+      CONFIG_PROMISE = Promise.resolve(CONFIG_CACHE);
       await initCountdownBanner();
     } else {
       showToast('刪除失敗：' + (result.error || '未知錯誤'), 'error');
@@ -2803,8 +2807,12 @@ async function saveLinksConfig() {
     const result = await response.json();
     if (result.success) {
       showToast('資源連結設定成功', 'success');
-      CONFIG_CACHE = null;
-      CONFIG_PROMISE = null;
+      if (!CONFIG_CACHE) CONFIG_CACHE = {};
+      for (let i = 1; i <= 4; i++) {
+        CONFIG_CACHE[`link_${i}_title`] = payload[`title${i}`];
+        CONFIG_CACHE[`link_${i}_url`] = payload[`url${i}`];
+      }
+      CONFIG_PROMISE = Promise.resolve(CONFIG_CACHE);
       await initQuickLinks();
     } else {
       showToast('儲存失敗：' + (result.error || '未知錯誤'), 'error');
