@@ -1222,6 +1222,9 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('teacher-sheet-link').href =
       `https://docs.google.com/spreadsheets/d/${CONFIG.SPREADSHEET_ID}/edit`;
     setEditorDefaultDate();
+    initCountdownBanner();
+    initQuickLinks();
+    initMarqueeData();
     return;
   }
   populateRoleSelects();
@@ -1241,6 +1244,8 @@ window.addEventListener('DOMContentLoaded', () => {
     if (saved.role === 'viewer') {
       // 先直接載入公告欄視圖，防止卡在空白狀態，並於背景拉取公告
       loadBoard();
+      initCountdownBanner();
+      initQuickLinks();
       initMarqueeData();
       hideLoading();
 
@@ -1251,6 +1256,8 @@ window.addEventListener('DOMContentLoaded', () => {
       ]).then(() => {
         // 更新完後重新整理視圖
         loadBoard(false);
+        initCountdownBanner();
+        initQuickLinks();
       }).catch(err => {
         console.warn('背景更新失敗：', err);
       });
@@ -1553,49 +1560,57 @@ async function verifyRolePin() {
 }
 
 let CONFIG_CACHE = null;
+let CONFIG_PROMISE = null;
 
 async function fetchConfig() {
   if (CONFIG_CACHE) return CONFIG_CACHE;
-  try {
-    const url = `https://docs.google.com/spreadsheets/d/${CONFIG.SPREADSHEET_ID}/gviz/tq?tqx=out:json&sheet=config&nocache=${Date.now()}`;
-    const res = await fetch(url);
-    const text = await res.text();
-    const match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/);
-    if (!match) throw new Error('無法解析 config 工作表');
-    const data = JSON.parse(match[1]);
-    const rows = data.table?.rows || [];
+  if (CONFIG_PROMISE) return CONFIG_PROMISE;
 
-    const config = {};
-    rows.forEach(row => {
-      const cells = row.c || [];
-      if (cells[0]?.v !== null && cells[0]?.v !== undefined) {
-        const key = String(cells[0].v).toLowerCase().trim();
-        const val = cells[1]?.v !== null && cells[1]?.v !== undefined ? String(cells[1].v).trim() : '';
-        config[key] = val;
+  CONFIG_PROMISE = (async () => {
+    try {
+      const url = `https://docs.google.com/spreadsheets/d/${CONFIG.SPREADSHEET_ID}/gviz/tq?tqx=out:json&sheet=config&nocache=${Date.now()}`;
+      const res = await fetch(url);
+      const text = await res.text();
+      const match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/);
+      if (!match) throw new Error('無法解析 config 工作表');
+      const data = JSON.parse(match[1]);
+      const rows = data.table?.rows || [];
+
+      const config = {};
+      rows.forEach(row => {
+        const cells = row.c || [];
+        if (cells[0]?.v !== null && cells[0]?.v !== undefined) {
+          const key = String(cells[0].v).toLowerCase().trim();
+          const val = cells[1]?.v !== null && cells[1]?.v !== undefined ? String(cells[1].v).trim() : '';
+          config[key] = val;
+        }
+      });
+
+      // 容錯備份一：如果 A1 有值但沒填 key
+      if (rows.length > 0 && !config['pin']) {
+        const firstRowCells = rows[0]?.c || [];
+        const val1 = firstRowCells[0]?.v;
+        if (val1 !== null && val1 !== undefined && val1 !== '') {
+          config['pin'] = String(val1).trim();
+        }
       }
-    });
 
-    // 容錯備份一：如果 A1 有值但沒填 key
-    if (rows.length > 0 && !config['pin']) {
-      const firstRowCells = rows[0]?.c || [];
-      const val1 = firstRowCells[0]?.v;
-      if (val1 !== null && val1 !== undefined && val1 !== '') {
-        config['pin'] = String(val1).trim();
+      // 容錯備份二：如果是 header
+      const cols = data.table?.cols || [];
+      if (cols[0]?.label && cols[0].label !== 'key' && !config['pin']) {
+        config['pin'] = String(cols[0].label).trim();
       }
-    }
 
-    // 容錯備份二：如果是 header
-    const cols = data.table?.cols || [];
-    if (cols[0]?.label && cols[0].label !== 'key' && !config['pin']) {
-      config['pin'] = String(cols[0].label).trim();
+      CONFIG_CACHE = config;
+      return config;
+    } catch (e) {
+      console.error('fetchConfig error:', e);
+      CONFIG_PROMISE = null; // 發生錯誤時重置，以便後續可以重試
+      throw e;
     }
+  })();
 
-    CONFIG_CACHE = config;
-    return config;
-  } catch (e) {
-    console.error('fetchConfig error:', e);
-    throw e;
-  }
+  return CONFIG_PROMISE;
 }
 
 function proceedFromRole() {
@@ -2534,7 +2549,21 @@ async function initCountdownBanner() {
       hideAllBanners();
       if (statusEl) statusEl.textContent = '目前狀態：未設定任何倒數活動';
       if (deleteBtn) deleteBtn.classList.add('hidden');
+      if (APP.adminSecret) {
+        const titleInput = document.getElementById('countdown-title-input');
+        const dateInput = document.getElementById('countdown-date-input');
+        if (titleInput) titleInput.value = '';
+        if (dateInput) dateInput.value = '';
+      }
       return;
+    }
+
+    // 只要有設定倒數資料且具有管理權限，即自動載入設定數值至輸入欄位以利修改
+    if (APP.adminSecret) {
+      const titleInput = document.getElementById('countdown-title-input');
+      const dateInput = document.getElementById('countdown-date-input');
+      if (titleInput) titleInput.value = title;
+      if (dateInput) dateInput.value = dateStr;
     }
 
     const targetDate = new Date(dateStr);
@@ -2560,22 +2589,18 @@ async function initCountdownBanner() {
         statusEl.innerHTML = `目前狀態：<strong>正在倒數【${title}】</strong><br>目標日期：${dateStr} (剩餘 ${daysLeft} 天)`;
       }
       if (deleteBtn) deleteBtn.classList.remove('hidden');
-
-      if (APP.adminSecret) {
-        const titleInput = document.getElementById('countdown-title-input');
-        const dateInput = document.getElementById('countdown-date-input');
-        if (titleInput) titleInput.value = title;
-        if (dateInput) dateInput.value = dateStr;
-      }
     } else {
       hideAllBanners();
-      if (statusEl) statusEl.innerHTML = `目前狀態：倒數活動【${title}】已過期 (${dateStr})`;
+      if (statusEl) {
+        statusEl.innerHTML = `目前狀態：倒數活動【${title}】已過期 (${dateStr})`;
+      }
       if (deleteBtn) deleteBtn.classList.remove('hidden');
     }
   } catch (e) {
     console.warn('載入倒數計時器失敗：', e);
     if (roleBanner) roleBanner.classList.add('hidden');
     if (boardBanner) boardBanner.classList.add('hidden');
+    if (statusEl) statusEl.textContent = '目前狀態：載入倒數設定失敗';
   }
 }
 
@@ -2613,6 +2638,7 @@ async function saveCountdownConfig() {
     if (result.success) {
       showToast('倒數計時器設定成功', 'success');
       CONFIG_CACHE = null;
+      CONFIG_PROMISE = null;
       await initCountdownBanner();
     } else {
       showToast('儲存失敗：' + (result.error || '未知錯誤'), 'error');
@@ -2660,6 +2686,7 @@ async function deleteCountdownConfig() {
       if (dateInput) dateInput.value = '';
 
       CONFIG_CACHE = null;
+      CONFIG_PROMISE = null;
       await initCountdownBanner();
     } else {
       showToast('刪除失敗：' + (result.error || '未知錯誤'), 'error');
@@ -2777,6 +2804,7 @@ async function saveLinksConfig() {
     if (result.success) {
       showToast('資源連結設定成功', 'success');
       CONFIG_CACHE = null;
+      CONFIG_PROMISE = null;
       await initQuickLinks();
     } else {
       showToast('儲存失敗：' + (result.error || '未知錯誤'), 'error');
