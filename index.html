@@ -894,6 +894,12 @@
       <button class="btn btn-ghost btn-sm" onclick="loadBoard()">重新整理</button>
     </div>
 
+    <!-- 倒數計時器橫幅 (公告欄頁面) -->
+    <div id="board-countdown-banner" class="role-countdown-banner hidden" style="margin-top: 0; margin-bottom: 16px; width: 100%; box-sizing: border-box; display: inline-flex;">
+      <span class="countdown-tag">倒數計時</span>
+      <span id="board-countdown-text">距離 -- 還有 -- 天</span>
+    </div>
+
     <!-- 今日速覽儀表板 -->
     <div id="dashboard-box" class="dashboard-box">
       <div class="dashboard-item">
@@ -1016,6 +1022,9 @@
         <!-- 倒數計時器設定（僅導師可見） -->
         <div id="teacher-countdown-config" style="margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--c-border);">
           <div class="teacher-panel-title">倒數計時器設定</div>
+          <div id="teacher-countdown-status" style="font-size: 0.77rem; color: var(--c-text-muted); margin-bottom: 12px; padding: 8px 12px; background: var(--c-bg); border-radius: var(--radius-sm); border: 1px solid var(--c-border); line-height: 1.5;">
+            目前狀態：讀取中...
+          </div>
           <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
             <div class="form-group">
               <label class="form-label" for="countdown-title-input">活動名稱</label>
@@ -1026,8 +1035,9 @@
               <input type="date" id="countdown-date-input">
             </div>
           </div>
-          <div style="display: flex; justify-content: flex-end;">
-            <button class="btn btn-primary btn-sm" id="btn-save-countdown" onclick="saveCountdownConfig()">儲存倒數設定</button>
+          <div style="display: flex; justify-content: flex-end; gap: 8px;">
+            <button class="btn btn-danger btn-sm hidden" id="btn-delete-countdown" onclick="deleteCountdownConfig()">刪除倒數</button>
+            <button class="btn btn-primary btn-sm" id="btn-save-countdown" onclick="saveCountdownConfig()">儲存倒數</button>
           </div>
         </div>
 
@@ -2300,28 +2310,20 @@ function closeCalendarModal() {
 //  幹部與小老師發布歷史管理、編輯與草稿暫存邏輯
 // ═══════════════════════════════════════════════════════
 async function initEditorPanel() {
-  // 1. 如果不是管理員或發布者，跳出
   if (APP.role !== 'editor') return;
 
   const historyCard = document.getElementById('editor-history-card');
   if (!historyCard) return;
 
-  // 導師管理模式下不顯示個人發布歷史 (有導師試算表管理面板)
   if (APP.adminSecret || !APP.posterLabel) {
     historyCard.classList.add('hidden');
     return;
   }
 
-  // 顯示發布歷史卡片區塊
   historyCard.classList.remove('hidden');
 
-  // 2. 註冊草稿自動存檔事件
   registerDraftListeners();
-
-  // 3. 讀取並還原草稿（如果有暫存）
   loadAutosaveDraft();
-
-  // 4. 讀取並渲染個人發布歷史列表
   loadEditorHistory();
 }
 
@@ -2331,11 +2333,9 @@ async function loadEditorHistory() {
   container.innerHTML = '<div style="text-align:center;padding:12px;color:var(--c-text-dim)">載入中...</div>';
 
   try {
-    // 拉取最新公告列表
     const bulletins = await fetchBulletins();
     APP.allBulletins = bulletins;
 
-    // 篩選出屬於該發布者的歷史公告 (依據 posterLabel)
     const myBulletins = bulletins.filter(b => b.posterName === APP.posterLabel);
 
     if (myBulletins.length === 0) {
@@ -2359,7 +2359,6 @@ async function loadEditorHistory() {
       item.className = 'history-item';
       if (isHidden) item.style.opacity = '0.55';
 
-      // 逸出內容避免 HTML 注入
       const safeContent = escHtml(b.content);
 
       item.innerHTML = `
@@ -2387,14 +2386,12 @@ function startEditMode(timestamp, category, subject, dueDate, content) {
   APP.isEditing = true;
   APP.editingTimestamp = timestamp;
 
-  // 更新表單 UI 標示處於編輯狀態
   document.querySelector('.editor-card-title').textContent = '編輯公告';
   document.getElementById('editor-verified-label').textContent = `${APP.posterLabel} (編輯模式)`;
   
   const submitBtn = document.getElementById('btn-submit');
   submitBtn.textContent = '儲存修改';
   
-  // 填入資料
   document.getElementById('ed-category').value = category;
   document.getElementById('ed-subject').value = subject;
   document.getElementById('ed-date').value = dueDate;
@@ -2404,7 +2401,6 @@ function startEditMode(timestamp, category, subject, dueDate, content) {
   
   updateCharCount();
 
-  // 滾動表單至檢視區域
   document.getElementById('editor-card').scrollIntoView({ behavior: 'smooth' });
   showToast('已載入公告內容至表單，修改後請點選「儲存修改」', 'info');
 }
@@ -2413,7 +2409,6 @@ function cancelEditMode() {
   APP.isEditing = false;
   APP.editingTimestamp = null;
 
-  // 還原表單 UI 樣式
   document.querySelector('.editor-card-title').textContent = '新增公告';
   document.getElementById('editor-verified-label').textContent = APP.posterLabel;
   
@@ -2455,13 +2450,8 @@ async function submitEditedBulletin(category, subject, dueDate, content) {
       showToast('公告更新成功', 'success');
       showStatusMsg('公告已成功更新！', 'success');
       
-      // 清除本機草稿暫存
       clearAutosaveDraft();
-      
-      // 結束編輯模式並還原表單
       cancelEditMode();
-      
-      // 重新整理發布歷史與公告清單
       initEditorPanel();
     } else {
       showToast('更新失敗：' + (result.error || '未知錯誤'), 'error');
@@ -2474,6 +2464,279 @@ async function submitEditedBulletin(category, subject, dueDate, content) {
     APP.isSubmitting = false;
     btn.disabled = false;
     btn.textContent = '發布公告';
+  }
+}
+
+async function initCountdownBanner() {
+  const roleBanner = document.getElementById('role-countdown-banner');
+  const roleText = document.getElementById('role-countdown-text');
+  const boardBanner = document.getElementById('board-countdown-banner');
+  const boardText = document.getElementById('board-countdown-text');
+  
+  const statusEl = document.getElementById('teacher-countdown-status');
+  const deleteBtn = document.getElementById('btn-delete-countdown');
+
+  try {
+    const config = await fetchConfig();
+    const title = config['countdown_title'];
+    const dateStr = config['countdown_date'];
+
+    const hideAllBanners = () => {
+      if (roleBanner) roleBanner.classList.add('hidden');
+      if (boardBanner) boardBanner.classList.add('hidden');
+    };
+
+    if (!title || !dateStr) {
+      hideAllBanners();
+      if (statusEl) statusEl.textContent = '目前狀態：未設定任何倒數活動';
+      if (deleteBtn) deleteBtn.classList.add('hidden');
+      return;
+    }
+
+    const targetDate = new Date(dateStr);
+    targetDate.setHours(0,0,0,0);
+    const today = new Date();
+    today.setHours(0,0,0,0);
+
+    const timeDiff = targetDate.getTime() - today.getTime();
+    const daysLeft = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
+
+    if (daysLeft >= 0) {
+      const displayText = `距離 ${title} 還有 ${daysLeft} 天`;
+      if (roleBanner && roleText) {
+        roleText.textContent = displayText;
+        roleBanner.classList.remove('hidden');
+      }
+      if (boardBanner && boardText) {
+        boardText.textContent = displayText;
+        boardBanner.classList.remove('hidden');
+      }
+
+      if (statusEl) {
+        statusEl.innerHTML = `目前狀態：<strong>正在倒數【${title}】</strong><br>目標日期：${dateStr} (剩餘 ${daysLeft} 天)`;
+      }
+      if (deleteBtn) deleteBtn.classList.remove('hidden');
+
+      if (APP.adminSecret) {
+        const titleInput = document.getElementById('countdown-title-input');
+        const dateInput = document.getElementById('countdown-date-input');
+        if (titleInput) titleInput.value = title;
+        if (dateInput) dateInput.value = dateStr;
+      }
+    } else {
+      hideAllBanners();
+      if (statusEl) statusEl.innerHTML = `目前狀態：倒數活動【${title}】已過期 (${dateStr})`;
+      if (deleteBtn) deleteBtn.classList.remove('hidden');
+    }
+  } catch (e) {
+    console.warn('載入倒數計時器失敗：', e);
+    if (roleBanner) roleBanner.classList.add('hidden');
+    if (boardBanner) boardBanner.classList.add('hidden');
+  }
+}
+
+async function saveCountdownConfig() {
+  const title = document.getElementById('countdown-title-input').value.trim();
+  const dateStr = document.getElementById('countdown-date-input').value;
+
+  if (!title || !dateStr) {
+    showToast('請填寫活動名稱與日期', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('btn-save-countdown');
+  btn.disabled = true;
+  btn.textContent = '儲存中…';
+
+  try {
+    const payload = {
+      action: 'updateCountdown',
+      adminSecret: APP.adminSecret,
+      title: title,
+      date: dateStr
+    };
+
+    const response = await fetch(CONFIG.WEB_APP_URL, {
+      method: 'POST',
+      mode: 'cors',
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const result = await response.json();
+    if (result.success) {
+      showToast('倒數計時器設定成功', 'success');
+      CONFIG_CACHE = null;
+      await initCountdownBanner();
+    } else {
+      showToast('儲存失敗：' + (result.error || '未知錯誤'), 'error');
+    }
+  } catch (e) {
+    showToast('連線失敗，請稍後再試', 'error');
+    console.error('Save countdown error:', e);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '儲存倒數';
+  }
+}
+
+async function deleteCountdownConfig() {
+  if (!confirm('確定要刪除目前的倒數計時活動嗎？')) return;
+
+  const btn = document.getElementById('btn-delete-countdown');
+  btn.disabled = true;
+  btn.textContent = '刪除中…';
+
+  try {
+    const payload = {
+      action: 'updateCountdown',
+      adminSecret: APP.adminSecret,
+      title: '',
+      date: ''
+    };
+
+    const response = await fetch(CONFIG.WEB_APP_URL, {
+      method: 'POST',
+      mode: 'cors',
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const result = await response.json();
+    if (result.success) {
+      showToast('倒數計時器已成功刪除', 'success');
+      
+      const titleInput = document.getElementById('countdown-title-input');
+      const dateInput = document.getElementById('countdown-date-input');
+      if (titleInput) titleInput.value = '';
+      if (dateInput) dateInput.value = '';
+
+      CONFIG_CACHE = null;
+      await initCountdownBanner();
+    } else {
+      showToast('刪除失敗：' + (result.error || '未知錯誤'), 'error');
+    }
+  } catch (e) {
+    showToast('連線失敗，請稍後再試', 'error');
+    console.error('Delete countdown error:', e);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '刪除倒數';
+  }
+}
+
+async function initQuickLinks() {
+  const container = document.getElementById('resources-list-container');
+  if (!container) return;
+
+  try {
+    const config = await fetchConfig();
+    
+    const defaultLinks = [
+      { title: '班級雲端硬碟', url: 'https://drive.google.com' },
+      { title: '學校官方首頁', url: 'https://www.google.com' },
+      { title: '學習歷程平台', url: 'https://e-portfolio.co.tw' },
+      { title: 'Collego 探索', url: 'https://collego.edu.tw' }
+    ];
+
+    const links = [];
+    for (let i = 1; i <= 4; i++) {
+      const titleVal = config[`link_${i}_title`];
+      const urlVal = config[`link_${i}_url`];
+
+      let finalTitle = '';
+      let finalUrl = '';
+
+      if (titleVal === undefined && urlVal === undefined) {
+        finalTitle = defaultLinks[i - 1].title;
+        finalUrl = defaultLinks[i - 1].url;
+      } else {
+        finalTitle = titleVal ? titleVal.trim() : '';
+        finalUrl = urlVal ? urlVal.trim() : '';
+      }
+      
+      if (finalTitle && finalUrl) {
+        links.push({ title: finalTitle, url: finalUrl });
+      }
+
+      if (APP.adminSecret) {
+        const titleInput = document.getElementById(`link-${i}-title-input`);
+        const urlInput = document.getElementById(`link-${i}-url-input`);
+        if (titleInput) titleInput.value = (titleVal !== undefined ? titleVal : defaultLinks[i - 1].title);
+        if (urlInput) urlInput.value = (urlVal !== undefined ? urlVal : defaultLinks[i - 1].url);
+      }
+    }
+
+    container.innerHTML = '';
+    if (links.length === 0) {
+      container.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; font-size: 0.77rem; color: var(--c-text-dim); padding: 8px 0;">未設定任何資源連結</div>';
+      return;
+    }
+
+    links.forEach(link => {
+      const btn = document.createElement('a');
+      btn.href = link.url;
+      btn.target = '_blank';
+      btn.className = 'resource-btn';
+      btn.textContent = link.title;
+      container.appendChild(btn);
+    });
+  } catch (e) {
+    console.warn('載入常用連結失敗：', e);
+  }
+}
+
+async function saveLinksConfig() {
+  const payload = {
+    action: 'updateLinks',
+    adminSecret: APP.adminSecret
+  };
+
+  for (let i = 1; i <= 4; i++) {
+    const title = document.getElementById(`link-${i}-title-input`).value.trim();
+    const url = document.getElementById(`link-${i}-url-input`).value.trim();
+    
+    if (title && !url) {
+      showToast(`請為連結 ${i}【${title}】填寫對應的網址 (URL)`, 'error');
+      return;
+    }
+
+    payload[`title${i}`] = title;
+    payload[`url${i}`] = url;
+  }
+
+  const btn = document.getElementById('btn-save-links');
+  btn.disabled = true;
+  btn.textContent = '儲存中…';
+
+  try {
+    const response = await fetch(CONFIG.WEB_APP_URL, {
+      method: 'POST',
+      mode: 'cors',
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const result = await response.json();
+    if (result.success) {
+      showToast('資源連結設定成功', 'success');
+      CONFIG_CACHE = null;
+      await initQuickLinks();
+    } else {
+      showToast('儲存失敗：' + (result.error || '未知錯誤'), 'error');
+    }
+  } catch (e) {
+    showToast('連線失敗，請稍後再試', 'error');
+    console.error('Save links error:', e);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '儲存連結設定';
   }
 }
 
