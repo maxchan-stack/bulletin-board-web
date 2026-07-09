@@ -1220,18 +1220,20 @@ window.addEventListener('DOMContentLoaded', () => {
     hideLoading();
 
     if (saved.role === 'viewer') {
+      // 先直接載入公告欄視圖，防止卡在空白狀態，並於背景拉取公告
+      loadBoard();
+      initMarqueeData();
+      hideLoading();
+
+      // 在背景進行靜默更新
       Promise.all([
-        fetchBulletins(),
+        fetchBulletins(true),
         fetchConfig()
       ]).then(() => {
-        loadBoard();
-        initMarqueeData();
-        hideLoading();
+        // 更新完後重新整理視圖
+        loadBoard(false);
       }).catch(err => {
-        console.error('載入失敗：', err);
-        loadBoard();
-        initMarqueeData();
-        hideLoading();
+        console.warn('背景更新失敗：', err);
       });
     } else if (saved.role === 'editor' && saved.verifiedPin) {
       showPage('edit');
@@ -1244,37 +1246,17 @@ window.addEventListener('DOMContentLoaded', () => {
       initEditorPanel();
     } else {
       showPage('role');
-      Promise.all([
-        fetchBulletins(),
-        fetchConfig(),
-        fetchTimetable()
-      ]).then(() => {
-        initMarqueeData();
-        setRolePageDate();
-        hideLoading();
-      }).catch(() => {
-        initMarqueeData();
-        setRolePageDate();
-        hideLoading();
-      });
+      setRolePageDate(); // 立即渲染本地日期與預設課表
+      initMarqueeData(); // 立即載入跑馬燈
+      hideLoading();
     }
     return;
   }
 
   showPage('role');
-  Promise.all([
-    fetchBulletins(),
-    fetchConfig(),
-    fetchTimetable()
-  ]).then(() => {
-    initMarqueeData();
-    setRolePageDate();
-    hideLoading();
-  }).catch(() => {
-    initMarqueeData();
-    setRolePageDate();
-    hideLoading();
-  });
+  setRolePageDate(); // 立即渲染本地日期與預設課表
+  initMarqueeData(); // 立即載入跑馬燈
+  hideLoading();
 });
 
 function populateRoleSelects() {
@@ -2672,20 +2654,39 @@ async function deleteCountdownConfig() {
   }
 }
 
+function renderQuickLinksGrid(container, links) {
+  container.innerHTML = '';
+  if (links.length === 0) {
+    container.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; font-size: 0.77rem; color: var(--c-text-dim); padding: 8px 0;">未設定任何資源連結</div>';
+    return;
+  }
+  links.forEach(link => {
+    const btn = document.createElement('a');
+    btn.href = link.url;
+    btn.target = '_blank';
+    btn.className = 'resource-btn';
+    btn.textContent = link.title;
+    container.appendChild(btn);
+  });
+}
+
 async function initQuickLinks() {
   const container = document.getElementById('resources-list-container');
   if (!container) return;
 
+  const defaultLinks = [
+    { title: '班級雲端硬碟', url: 'https://drive.google.com' },
+    { title: '學校官方首頁', url: 'https://www.google.com' },
+    { title: '學習歷程平台', url: 'https://e-portfolio.co.tw' },
+    { title: 'Collego 探索', url: 'https://collego.edu.tw' }
+  ];
+
+  // 1. 先用預設連結快速渲染（防止畫面空白）
+  renderQuickLinksGrid(container, defaultLinks);
+
+  // 2. 於背景拉取最新雲端設定，如果成功則無縫更新
   try {
     const config = await fetchConfig();
-    
-    const defaultLinks = [
-      { title: '班級雲端硬碟', url: 'https://drive.google.com' },
-      { title: '學校官方首頁', url: 'https://www.google.com' },
-      { title: '學習歷程平台', url: 'https://e-portfolio.co.tw' },
-      { title: 'Collego 探索', url: 'https://collego.edu.tw' }
-    ];
-
     const links = [];
     for (let i = 1; i <= 4; i++) {
       const titleVal = config[`link_${i}_title`];
@@ -2714,22 +2715,9 @@ async function initQuickLinks() {
       }
     }
 
-    container.innerHTML = '';
-    if (links.length === 0) {
-      container.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; font-size: 0.77rem; color: var(--c-text-dim); padding: 8px 0;">未設定任何資源連結</div>';
-      return;
-    }
-
-    links.forEach(link => {
-      const btn = document.createElement('a');
-      btn.href = link.url;
-      btn.target = '_blank';
-      btn.className = 'resource-btn';
-      btn.textContent = link.title;
-      container.appendChild(btn);
-    });
+    renderQuickLinksGrid(container, links);
   } catch (e) {
-    console.warn('載入常用連結失敗：', e);
+    console.warn('背景載入常用連結失敗，維持預設連結：', e);
   }
 }
 
@@ -2896,28 +2884,12 @@ async function fetchTimetable() {
   }
 }
 
-async function renderTodayTimetable(dayNum) {
-  const titleEl = document.getElementById('timetable-title');
-  const gridEl = document.getElementById('timetable-grid');
-  if (!titleEl || !gridEl) return;
-
-  const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
-  const dayName = weekdays[dayNum];
-  titleEl.textContent = `今日課表 (週${dayName})`;
-
+function renderTimetableGrid(gridEl, periods, dayNum) {
   gridEl.innerHTML = '';
-
   if (dayNum === 0 || dayNum === 6) {
     gridEl.innerHTML = '<div class="timetable-weekend" style="grid-column: 1 / -1;">今日休息，週末愉快！</div>';
     return;
   }
-
-  let timetable = await fetchTimetable();
-  if (!timetable) {
-    timetable = TIMETABLE_DATA;
-  }
-
-  const periods = timetable[dayNum] || [];
   periods.forEach((subject, index) => {
     const periodBox = document.createElement('div');
     periodBox.className = 'timetable-period';
@@ -2927,6 +2899,29 @@ async function renderTodayTimetable(dayNum) {
     `;
     gridEl.appendChild(periodBox);
   });
+}
+
+async function renderTodayTimetable(dayNum) {
+  const titleEl = document.getElementById('timetable-title');
+  const gridEl = document.getElementById('timetable-grid');
+  if (!titleEl || !gridEl) return;
+
+  const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+  const dayName = weekdays[dayNum];
+  titleEl.textContent = `今日課表 (週${dayName})`;
+
+  // 1. 立即用本地預設課表渲染（避免卡在載入中）
+  renderTimetableGrid(gridEl, TIMETABLE_DATA[dayNum] || [], dayNum);
+
+  // 2. 於背景拉取最新雲端課表，如果成功則無縫更新
+  try {
+    const timetable = await fetchTimetable();
+    if (timetable) {
+      renderTimetableGrid(gridEl, timetable[dayNum] || [], dayNum);
+    }
+  } catch (e) {
+    console.warn('背景雲端課表加載失敗，維持預設課表：', e.message);
+  }
 }
 
 async function initCountdownBanner() {
