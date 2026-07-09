@@ -845,11 +845,8 @@
     <!-- 常用資源區塊 -->
     <div class="resources-card" id="resources-card">
       <div class="resources-title">常用資源</div>
-      <div class="resources-grid">
-        <a href="https://drive.google.com" target="_blank" class="resource-btn">班級雲端硬碟</a>
-        <a href="https://www.google.com" target="_blank" class="resource-btn">學校官方首頁</a>
-        <a href="https://e-portfolio.co.tw" target="_blank" class="resource-btn">學習歷程平台</a>
-        <a href="https://collego.edu.tw" target="_blank" class="resource-btn">Collego 探索</a>
+      <div class="resources-grid" id="resources-list-container">
+        <!-- 由 JS 動態生成 -->
       </div>
     </div>
 
@@ -1031,6 +1028,32 @@
           </div>
           <div style="display: flex; justify-content: flex-end;">
             <button class="btn btn-primary btn-sm" id="btn-save-countdown" onclick="saveCountdownConfig()">儲存倒數設定</button>
+          </div>
+        </div>
+
+        <!-- 常用連結設定（僅導師可見） -->
+        <div id="teacher-links-config" style="margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--c-border);">
+          <div class="teacher-panel-title">資源連結入口設定</div>
+          <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px;">
+            <div class="form-grid" style="grid-template-columns: 1fr 2fr; gap: 8px; margin-bottom: 0;">
+              <input type="text" id="link-1-title-input" placeholder="連結一標題">
+              <input type="text" id="link-1-url-input" placeholder="連結一網址 (URL)">
+            </div>
+            <div class="form-grid" style="grid-template-columns: 1fr 2fr; gap: 8px; margin-bottom: 0;">
+              <input type="text" id="link-2-title-input" placeholder="連結二標題">
+              <input type="text" id="link-2-url-input" placeholder="連結二網址 (URL)">
+            </div>
+            <div class="form-grid" style="grid-template-columns: 1fr 2fr; gap: 8px; margin-bottom: 0;">
+              <input type="text" id="link-3-title-input" placeholder="連結三標題">
+              <input type="text" id="link-3-url-input" placeholder="連結三網址 (URL)">
+            </div>
+            <div class="form-grid" style="grid-template-columns: 1fr 2fr; gap: 8px; margin-bottom: 0;">
+              <input type="text" id="link-4-title-input" placeholder="連結四標題">
+              <input type="text" id="link-4-url-input" placeholder="連結四網址 (URL)">
+            </div>
+          </div>
+          <div style="display: flex; justify-content: flex-end;">
+            <button class="btn btn-primary btn-sm" id="btn-save-links" onclick="saveLinksConfig()">儲存連結設定</button>
           </div>
         </div>
       </div>
@@ -1347,6 +1370,9 @@ function setRolePageDate() {
 
   // 載入倒數計時器
   initCountdownBanner();
+
+  // 載入常用資源連結
+  initQuickLinks();
 }
 
 
@@ -2634,6 +2660,104 @@ async function saveCountdownConfig() {
   } finally {
     btn.disabled = false;
     btn.textContent = '儲存倒數設定';
+  }
+}
+
+async function initQuickLinks() {
+  const container = document.getElementById('resources-list-container');
+  if (!container) return;
+
+  try {
+    const config = await fetchConfig();
+    
+    // 定義預設值
+    const defaultLinks = [
+      { title: '班級雲端硬碟', url: 'https://drive.google.com' },
+      { title: '學校官方首頁', url: 'https://www.google.com' },
+      { title: '學習歷程平台', url: 'https://e-portfolio.co.tw' },
+      { title: 'Collego 探索', url: 'https://collego.edu.tw' }
+    ];
+
+    const links = [];
+    for (let i = 1; i <= 4; i++) {
+      const title = config[`link_${i}_title`] || defaultLinks[i - 1].title;
+      const url = config[`link_${i}_url`] || defaultLinks[i - 1].url;
+      links.push({ title, url });
+
+      // 如果是管理員，填入後台表單以便編輯
+      if (APP.adminSecret) {
+        const titleInput = document.getElementById(`link-${i}-title-input`);
+        const urlInput = document.getElementById(`link-${i}-url-input`);
+        if (titleInput) titleInput.value = title;
+        if (urlInput) urlInput.value = url;
+      }
+    }
+
+    container.innerHTML = '';
+    links.forEach(link => {
+      if (link.title && link.url) {
+        const btn = document.createElement('a');
+        btn.href = link.url;
+        btn.target = '_blank';
+        btn.className = 'resource-btn';
+        btn.textContent = link.title;
+        container.appendChild(btn);
+      }
+    });
+  } catch (e) {
+    console.warn('載入常用連結失敗：', e);
+  }
+}
+
+async function saveLinksConfig() {
+  const payload = {
+    action: 'updateLinks',
+    adminSecret: APP.adminSecret
+  };
+
+  for (let i = 1; i <= 4; i++) {
+    const title = document.getElementById(`link-${i}-title-input`).value.trim();
+    const url = document.getElementById(`link-${i}-url-input`).value.trim();
+    
+    if (!title || !url) {
+      showToast('請填寫所有連結的標題與網址', 'error');
+      return;
+    }
+    
+    payload[`title${i}`] = title;
+    payload[`url${i}`] = url;
+  }
+
+  const btn = document.getElementById('btn-save-links');
+  btn.disabled = true;
+  btn.textContent = '儲存中…';
+
+  try {
+    const response = await fetch(CONFIG.WEB_APP_URL, {
+      method: 'POST',
+      mode: 'cors',
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const result = await response.json();
+    if (result.success) {
+      showToast('資源連結設定成功', 'success');
+      // 清除本地 config 快取以利重新讀取
+      CONFIG_CACHE = null;
+      // 重新載入首頁連結
+      await initQuickLinks();
+    } else {
+      showToast('儲存失敗：' + (result.error || '未知錯誤'), 'error');
+    }
+  } catch (e) {
+    showToast('連線失敗，請稍後再試', 'error');
+    console.error('Save links error:', e);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '儲存連結設定';
   }
 }
 
