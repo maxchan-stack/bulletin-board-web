@@ -2657,6 +2657,12 @@ async function saveCountdownConfig() {
 async function deleteCountdownConfig() {
   if (!confirm('確定要刪除目前的倒數計時活動嗎？')) return;
 
+  if (!APP.adminSecret) {
+    showToast('錯誤：未找到管理員金鑰，請確認您使用管理員連結進入', 'error');
+    console.error('[deleteCountdown] APP.adminSecret 為空，無法刪除');
+    return;
+  }
+
   const btn = document.getElementById('btn-delete-countdown');
   btn.disabled = true;
   btn.textContent = '刪除中…';
@@ -2669,6 +2675,8 @@ async function deleteCountdownConfig() {
       date: ''
     };
 
+    console.log('[deleteCountdown] 傳送 payload:', JSON.stringify(payload));
+
     const response = await fetch(CONFIG.WEB_APP_URL, {
       method: 'POST',
       mode: 'cors',
@@ -2679,6 +2687,8 @@ async function deleteCountdownConfig() {
     });
 
     const result = await response.json();
+    console.log('[deleteCountdown] 後端回傳:', result);
+
     if (result.success) {
       showToast('倒數計時器已成功刪除', 'success');
       
@@ -2693,11 +2703,13 @@ async function deleteCountdownConfig() {
       CONFIG_PROMISE = Promise.resolve(CONFIG_CACHE);
       await initCountdownBanner();
     } else {
-      showToast('刪除失敗：' + (result.error || '未知錯誤'), 'error');
+      const errMsg = result.error || '未知錯誤';
+      showToast('刪除失敗：' + errMsg, 'error');
+      console.error('[deleteCountdown] 後端回傳失敗：', errMsg);
     }
   } catch (e) {
     showToast('連線失敗，請稍後再試', 'error');
-    console.error('Delete countdown error:', e);
+    console.error('[deleteCountdown] 例外錯誤：', e);
   } finally {
     btn.disabled = false;
     btn.textContent = '刪除倒數';
