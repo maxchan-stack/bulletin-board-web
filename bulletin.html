@@ -3,7 +3,7 @@
 <head>
   <!-- v32.0.1 -->
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>高二甲班電子佈告欄</title>
   <meta name="description" content="高二甲班作業、小考、老師交代事項、學校行政公告查詢平台">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1171,7 +1171,8 @@ function saveRole() {
       role: APP.role, posterType: APP.posterType,
       posterLabel: APP.posterLabel, posterSubject: APP.posterSubject,
       verifiedPin: APP.verifiedPin,
-      verifiedPinVal: APP.verifiedPinVal
+      verifiedPinVal: APP.verifiedPinVal,
+      adminSecret: APP.adminSecret // 儲存管理員金鑰，重整網頁時才不會被登出
     }));
   } catch (e) { /* localStorage 不可用 */ }
 }
@@ -1267,6 +1268,7 @@ window.addEventListener('DOMContentLoaded', () => {
         console.warn('背景更新失敗：', err);
       });
     } else if (saved.role === 'editor' && saved.verifiedPin) {
+      APP.adminSecret = saved.adminSecret || null; // 還原管理員金鑰
       showPage('edit');
       setEditorDefaultDate();
       if (APP.posterSubject) document.getElementById('ed-subject').value = APP.posterSubject;
@@ -1274,7 +1276,17 @@ window.addEventListener('DOMContentLoaded', () => {
       document.getElementById('editor-verified-label').textContent = APP.posterLabel;
       document.getElementById('poster-display-name').textContent = APP.posterLabel;
       
+      // 如果還原的是導師角色，則打開導師控制面板與填入試算表網址
+      if (APP.posterLabel === '導師') {
+        document.getElementById('teacher-panel').classList.remove('hidden');
+        document.getElementById('teacher-sheet-link').href =
+          `https://docs.google.com/spreadsheets/d/${CONFIG.SPREADSHEET_ID}/edit`;
+      }
+      
       initEditorPanel();
+      initCountdownBanner(); // 同步初始化倒數計時器
+      initQuickLinks();     // 同步初始化連結
+      initMarqueeData();    // 同步初始化跑馬燈
     } else {
       showPage('role');
       setRolePageDate(); // 立即渲染本地日期與預設課表
@@ -1544,9 +1556,23 @@ async function verifyRolePin() {
   document.getElementById('pin-error').textContent = '';
 
   try {
-    const config = await fetchConfig();
-    const correctPin = config['pin'];
-    if (pin === String(correctPin)) {
+    // 改為向後端發送請求進行安全驗證，防止授權碼洩漏在前端
+    const payload = {
+      action: 'verifyPin',
+      pin: pin
+    };
+
+    const response = await fetch(CONFIG.WEB_APP_URL, {
+      method: 'POST',
+      mode: 'cors',
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const result = await response.json();
+    if (result.success) {
       APP.verifiedPin = true;
       APP.verifiedPinVal = pin; // 暫存驗證過的 PIN 碼
       proceedFromRole();
@@ -1556,8 +1582,8 @@ async function verifyRolePin() {
       document.getElementById('role-pin').focus();
     }
   } catch (e) {
-    document.getElementById('pin-error').textContent = '驗證出錯: ' + e.message + ' (請嘗試強制重新整理網頁)';
-    console.error('PIN fetch error:', e);
+    document.getElementById('pin-error').textContent = '驗證連線失敗，請稍後再試';
+    console.error('PIN verification error:', e);
   } finally {
     btn.disabled = false;
     btn.textContent = '驗證';
@@ -1582,29 +1608,17 @@ async function fetchConfig() {
       const rows = data.table?.rows || [];
 
       const config = {};
-      rows.forEach(row => {
+      rows.forEach((row, idx) => {
         const cells = row.c || [];
         if (cells[0]?.v !== null && cells[0]?.v !== undefined) {
           const key = String(cells[0].v).toLowerCase().trim();
+          // 不要在前端快取中透露任何 PIN 資訊 (包含第一列 A1 若為獨立數值的情況)
+          if (key === 'pin') return;
+          if (idx === 0 && /^\d+$/.test(key)) return; // 若第一列 A1 是純數字，通常是手動輸入的 PIN，過濾不載入
           const val = cells[1]?.v !== null && cells[1]?.v !== undefined ? String(cells[1].v).trim() : '';
           config[key] = val;
         }
       });
-
-      // 容錯備份一：如果 A1 有值但沒填 key
-      if (rows.length > 0 && !config['pin']) {
-        const firstRowCells = rows[0]?.c || [];
-        const val1 = firstRowCells[0]?.v;
-        if (val1 !== null && val1 !== undefined && val1 !== '') {
-          config['pin'] = String(val1).trim();
-        }
-      }
-
-      // 容錯備份二：如果是 header
-      const cols = data.table?.cols || [];
-      if (cols[0]?.label && cols[0].label !== 'key' && !config['pin']) {
-        config['pin'] = String(cols[0].label).trim();
-      }
 
       CONFIG_CACHE = config;
       return config;
