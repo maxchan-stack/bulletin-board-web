@@ -46,6 +46,9 @@
       justify-content: space-between;
       padding: 40px 20px;
       -webkit-font-smoothing: antialiased;
+      position: relative;
+      width: 100%;
+      overflow-x: hidden; /* 防止背景光暈導致橫向捲動軸 */
     }
 
     /* ── 背景光暈裝飾 ── */
@@ -129,7 +132,7 @@
       background: var(--c-surface);
       border: 1.5px solid var(--c-border);
       border-radius: var(--radius-lg);
-      padding: 32px 24px;
+      padding: 36px 24px 28px 24px;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
@@ -167,6 +170,29 @@
     .card.c-grades:hover { border-color: var(--c-grades); }
     .card.c-ledger:hover { border-color: var(--c-ledger); }
 
+    /* 卡片分類狀態標籤 */
+    .card-badge {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 12px;
+      margin-bottom: 16px;
+      letter-spacing: 0.04em;
+    }
+    .card.c-bulletin .card-badge {
+      background: rgba(26,93,87,0.08);
+      color: var(--c-bulletin);
+    }
+    .card.c-grades .card-badge {
+      background: rgba(76,114,159,0.08);
+      color: var(--c-grades);
+    }
+    .card.c-ledger .card-badge {
+      background: rgba(200,134,42,0.08);
+      color: var(--c-ledger);
+    }
+
     /* 圖示設計 */
     .icon-wrapper {
       width: 80px;
@@ -176,7 +202,7 @@
       align-items: center;
       justify-content: center;
       font-size: 2.2rem;
-      margin-bottom: 24px;
+      margin-bottom: 20px;
       transition: var(--transition);
       background: #f7f9f9;
       border: 1px solid var(--c-border);
@@ -237,19 +263,71 @@
       letter-spacing: 0.05em;
     }
 
+    /* ── 進入漸入動畫 ── */
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    header {
+      animation: fadeInUp 0.6s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
+    }
+
+    .card {
+      opacity: 0;
+      animation: fadeInUp 0.6s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
+    }
+
+    .card:nth-child(1) { animation-delay: 0.1s; }
+    .card:nth-child(2) { animation-delay: 0.2s; }
+    .card:nth-child(3) { animation-delay: 0.3s; }
+
+    footer {
+      opacity: 0;
+      animation: fadeInUp 0.6s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
+      animation-delay: 0.4s;
+    }
+
     /* ── RWD 響應式調整 ── */
     @media (max-width: 768px) {
       body {
         padding: 30px 16px;
       }
       h1 {
-        font-size: 1.8rem;
+        font-size: 1.6rem;
       }
       .subtitle {
-        font-size: 0.95rem;
+        font-size: 0.9rem;
+        margin-bottom: 24px;
       }
       .grid {
         gap: 20px;
+        grid-template-columns: 1fr;
+      }
+      .card {
+        padding: 24px 20px 24px 20px;
+      }
+      .icon-wrapper {
+        width: 64px;
+        height: 64px;
+        font-size: 1.8rem;
+        margin-bottom: 16px;
+      }
+      .card-title {
+        font-size: 1.2rem;
+      }
+      .card-desc {
+        font-size: 0.88rem;
+        margin-bottom: 20px;
+      }
+      .card-badge {
+        margin-bottom: 12px;
       }
     }
   </style>
@@ -271,6 +349,7 @@
     <div class="grid">
       <!-- 📌 電子布告欄 -->
       <a class="card c-bulletin" id="link-bulletin" href="./bulletin.html">
+        <span class="card-badge">每日即時更新</span>
         <div class="icon-wrapper">📌</div>
         <div class="card-title">班級電子布告欄</div>
         <div class="card-desc">每日作業、小考範圍、老師交代事項以及學校行政公告即時發布與查詢。</div>
@@ -281,6 +360,7 @@
 
       <!-- 📊 成績查詢系統 -->
       <a class="card c-grades" target="_blank" href="https://script.google.com/a/macros/webmail.ccsh.tp.edu.tw/s/AKfycbwtmiwyFUYcw2_sXZHcjKF8c8AgVHVhb8EnEyN2VyrybyW5PLYMPo577tOSvv8-kPS7NQ/exec">
+        <span class="card-badge">需學校 @ccsh 帳號登入</span>
         <div class="icon-wrapper">📊</div>
         <div class="card-title">學生成績查詢系統</div>
         <div class="card-desc">段考成績、平時小考測驗分數與學生學習表現進度即時線上查詢。</div>
@@ -291,6 +371,7 @@
 
       <!-- 💰 班費查詢系統 -->
       <a class="card c-ledger" target="_blank" href="https://maxchan-stack.github.io/class-fund-ledger/?view=parent&api=1SXMyhMQVpc3Lt5sBrIOnC7baKkQKPIVExn0lfpnCnTOm-GxBF09ir9rv">
+        <span class="card-badge">定期公開透明</span>
         <div class="icon-wrapper">💰</div>
         <div class="card-title">班費收支查詢系統</div>
         <div class="card-desc">班費明細、支出明細、繳費明細及班費餘額，提供公開透明的財務管道。</div>
@@ -308,7 +389,7 @@
 
   <script>
     // ═══════════════════════════════════════════════════════
-    //  動態參數轉導邏輯
+    //  動態參數轉轉導邏輯
     // ═══════════════════════════════════════════════════════
     // 當老師點選包含 ?admin=... 的整合入口網址時，自動將金鑰傳遞至布告欄卡片
     const urlParams = new URLSearchParams(window.location.search);
