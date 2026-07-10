@@ -1205,9 +1205,13 @@ function isExpired(b) {
 //  初始化
 // ═══════════════════════════════════════════════════════
 window.addEventListener('DOMContentLoaded', () => {
-  // 管理後台：URL 包含 ?admin=XXX 時
+  // 管理後台：URL 包含 ?admin=XXX 時，支援 GAS Web App 與網頁直接讀取
   const urlParams = new URLSearchParams(window.location.search);
-  const adminSecret = urlParams.get('admin');
+  let adminSecret = urlParams.get('admin');
+  if (!adminSecret && window.GAS_PARAMS && window.GAS_PARAMS.admin) {
+    adminSecret = window.GAS_PARAMS.admin;
+  }
+
   if (adminSecret) {
     APP.role = 'editor';
     APP.posterType = 'teacher';
@@ -3030,48 +3034,7 @@ async function renderWeeklyTimetable() {
   });
 }
 
-async function initCountdownBanner() {
-  const banner = document.getElementById('role-countdown-banner');
-  const textEl = document.getElementById('role-countdown-text');
-  if (!banner || !textEl) return;
 
-  try {
-    const config = await fetchConfig();
-    const title = config['countdown_title'];
-    const dateStr = config['countdown_date'];
-
-    if (!title || !dateStr) {
-      banner.classList.add('hidden');
-      return;
-    }
-
-    const targetDate = new Date(dateStr);
-    targetDate.setHours(0,0,0,0);
-    const today = new Date();
-    today.setHours(0,0,0,0);
-
-    const timeDiff = targetDate.getTime() - today.getTime();
-    const daysLeft = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
-
-    if (daysLeft >= 0) {
-      textEl.textContent = `距離 ${title} 還有 ${daysLeft} 天`;
-      banner.classList.remove('hidden');
-
-      // 如果是導師登入，順便把值填入後台設定欄位以利查看/修改
-      if (APP.adminSecret) {
-        const titleInput = document.getElementById('countdown-title-input');
-        const dateInput = document.getElementById('countdown-date-input');
-        if (titleInput) titleInput.value = title;
-        if (dateInput) dateInput.value = dateStr;
-      }
-    } else {
-      banner.classList.add('hidden');
-    }
-  } catch (e) {
-    console.warn('載入倒數計時器失敗：', e);
-    banner.classList.add('hidden');
-  }
-}
 
 
 // ═══════════════════════════════════════════════════════
