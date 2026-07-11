@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>高二甲班 學生服務入口</title>
-  <meta name="description" content="高二甲班專屬學生服務門戶，快速連結電子布告欄與成績查詢系統。">
+  <title>高二甲班 家長服務入口</title>
+  <meta name="description" content="高二甲班專屬家長服務門戶，快速連結電子布告欄、學生成績及班費查詢系統。">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
@@ -22,6 +22,7 @@
       
       --c-bulletin:     #1a5d57;
       --c-grades:       #4c729f;
+      --c-ledger:       #c8862a;
 
       --transition:     all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
       --radius-lg:      16px;
@@ -77,7 +78,7 @@
     /* ── 容器 ── */
     .container {
       width: 100%;
-      max-width: 800px;
+      max-width: 1080px;
       margin: auto;
       text-align: center;
     }
@@ -150,6 +151,7 @@
 
     .card:nth-child(1) { animation-delay: 0.1s; }
     .card:nth-child(2) { animation-delay: 0.2s; }
+    .card:nth-child(3) { animation-delay: 0.3s; }
 
     .card:hover {
       transform: translateY(-8px) scale(1.02);
@@ -168,9 +170,11 @@
 
     .card.c-bulletin::before { background: var(--c-bulletin); }
     .card.c-grades::before { background: var(--c-grades); }
+    .card.c-ledger::before { background: var(--c-ledger); }
 
     .card.c-bulletin:hover { border-color: var(--c-bulletin); }
     .card.c-grades:hover { border-color: var(--c-grades); }
+    .card.c-ledger:hover { border-color: var(--c-ledger); }
 
     /* 卡片分類狀態標籤 */
     .card-badge {
@@ -190,6 +194,10 @@
       background: rgba(76,114,159,0.08);
       color: var(--c-grades);
     }
+    .card.c-ledger .card-badge {
+      background: rgba(200,134,42,0.08);
+      color: var(--c-ledger);
+    }
 
     /* 圖示設計 */
     .icon-wrapper {
@@ -208,6 +216,7 @@
 
     .card.c-bulletin:hover .icon-wrapper { background: rgba(26,93,87,0.08); border-color: rgba(26,93,87,0.2); }
     .card.c-grades:hover .icon-wrapper { background: rgba(76,114,159,0.08); border-color: rgba(76,114,159,0.2); }
+    .card.c-ledger:hover .icon-wrapper { background: rgba(200,134,42,0.08); border-color: rgba(200,134,42,0.2); }
 
     /* 文字樣式 */
     .card-title {
@@ -249,6 +258,9 @@
     .card.c-grades .card-btn { background: var(--c-grades); color: #ffffff; }
     .card.c-grades:hover .card-btn { background: #3d5c80; }
 
+    .card.c-ledger .card-btn { background: var(--c-ledger); color: #ffffff; }
+    .card.c-ledger:hover .card-btn { background: #b07420; }
+
     /* ── 頁尾資訊 ── */
     footer {
       margin-top: 24px;
@@ -257,7 +269,7 @@
       letter-spacing: 0.05em;
       opacity: 0;
       animation: fadeInUp 0.6s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
-      animation-delay: 0.3s;
+      animation-delay: 0.4s;
     }
 
     /* ── 進入漸入動畫 ── */
@@ -314,9 +326,9 @@
   <div class="container">
     <!-- 標頭區 -->
     <header>
-      <div class="class-badge">臺北市立中正高中 · 學生專區</div>
-      <h1>高二甲班 學生服務入口</h1>
-      <p class="subtitle">專為學生設計的整合平台，助你隨時掌握最新課業任務與學業進度。</p>
+      <div class="class-badge">臺北市立中正高中 · 家長專區</div>
+      <h1>高二甲班 家長服務入口</h1>
+      <p class="subtitle">專為家長設計的公開透明平台，讓您掌握最新班級動態並便利連結各項查詢服務。</p>
     </header>
 
     <!-- 卡片網格區 -->
@@ -340,6 +352,17 @@
         <div class="card-desc">段考成績、平時小考測驗分數與學習表現進度即時線上查詢。</div>
         <div class="card-btn">
           開啟成績系統 ↗
+        </div>
+      </a>
+
+      <!-- 💰 班費查詢系統 -->
+      <a class="card c-ledger" target="_blank" href="https://maxchan-stack.github.io/class-fund-ledger/?view=parent&api=AKfycbwBoo653bMsvkZceaXks8x2Ul2GuFJWI5ctXQMkh3vq_YLolAerNJWIv9gRyEnOmvN_Bw">
+        <span class="card-badge">定期公開透明</span>
+        <div class="icon-wrapper">💰</div>
+        <div class="card-title">班費收支查詢系統</div>
+        <div class="card-desc">班費明細、支出明細、繳費明細及班費餘額，提供公開透明的財務管道。</div>
+        <div class="card-btn">
+          開啟班費系統 ↗
         </div>
       </a>
     </div>
