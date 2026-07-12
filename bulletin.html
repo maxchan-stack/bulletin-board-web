@@ -203,12 +203,16 @@
         font-size: 1.45rem;
       }
       .role-header p {
-        font-size: 0.8rem;
+        font-size: 0.78rem;
         line-height: 1.6;
       }
+      .role-header p br {
+        display: none;
+      }
       .role-huge-date {
-        padding: 8px 14px;
-        min-width: 110px;
+        padding: 0;
+        min-width: 0;
+        margin-left: 12px;
       }
       .huge-date-month-day {
         font-size: 2.5rem;
@@ -621,7 +625,9 @@
       .role-card.selected::before { top: 8px; right: 8px; width: 16px; height: 16px; font-size: 0.55rem; }
       .role-header { margin-bottom: 28px; }
       .role-header h1 { font-size: 1.3rem; }
-      .role-header p { font-size: 0.79rem; }
+      .role-header p { font-size: 0.75rem; line-height: 1.5; }
+      .role-header p br { display: none; }
+      .role-huge-date { padding: 0; min-width: 0; margin-left: 10px; }
       .card { padding: 14px 16px; gap: 10px; }
       .card-content { font-size: 0.84rem; }
       .section-title { font-size: 1.15rem; }
