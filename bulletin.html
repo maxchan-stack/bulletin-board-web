@@ -1089,7 +1089,7 @@
     </div>
 
     <!-- 常用資源區塊 -->
-    <div class="resources-card" id="resources-card">
+    <div class="resources-card hidden" id="resources-card">
       <div class="resources-title">常用資源</div>
       <div class="resources-grid" id="resources-list-container">
         <!-- 由 JS 動態生成 -->
@@ -2948,17 +2948,8 @@ async function initQuickLinks() {
   const container = document.getElementById('resources-list-container');
   if (!container) return;
 
-  const defaultLinks = [
-    { title: '班級雲端硬碟', url: 'https://drive.google.com' },
-    { title: '學校官方首頁', url: 'https://www.google.com' },
-    { title: '學習歷程平台', url: 'https://e-portfolio.co.tw' },
-    { title: 'Collego 探索', url: 'https://collego.edu.tw' }
-  ];
+  const card = document.getElementById('resources-card');
 
-  // 1. 先用預設連結快速渲染（防止畫面空白）
-  renderQuickLinksGrid(container, defaultLinks);
-
-  // 2. 於背景拉取最新雲端設定，如果成功則無縫更新
   try {
     const config = await fetchConfig();
     const links = [];
@@ -2966,16 +2957,8 @@ async function initQuickLinks() {
       const titleVal = config[`link_${i}_title`];
       const urlVal = config[`link_${i}_url`];
 
-      let finalTitle = '';
-      let finalUrl = '';
-
-      if (titleVal === undefined && urlVal === undefined) {
-        finalTitle = defaultLinks[i - 1].title;
-        finalUrl = defaultLinks[i - 1].url;
-      } else {
-        finalTitle = titleVal ? titleVal.trim() : '';
-        finalUrl = urlVal ? urlVal.trim() : '';
-      }
+      const finalTitle = titleVal ? titleVal.trim() : '';
+      const finalUrl = urlVal ? urlVal.trim() : '';
       
       if (finalTitle && finalUrl) {
         links.push({ title: finalTitle, url: finalUrl });
@@ -2984,14 +2967,20 @@ async function initQuickLinks() {
       if (APP.adminSecret) {
         const titleInput = document.getElementById(`link-${i}-title-input`);
         const urlInput = document.getElementById(`link-${i}-url-input`);
-        if (titleInput) titleInput.value = (titleVal !== undefined ? titleVal : defaultLinks[i - 1].title);
-        if (urlInput) urlInput.value = (urlVal !== undefined ? urlVal : defaultLinks[i - 1].url);
+        if (titleInput) titleInput.value = (titleVal !== undefined ? titleVal.trim() : '');
+        if (urlInput) urlInput.value = (urlVal !== undefined ? urlVal.trim() : '');
       }
     }
 
-    renderQuickLinksGrid(container, links);
+    if (links.length > 0) {
+      renderQuickLinksGrid(container, links);
+      if (card) card.classList.remove('hidden');
+    } else {
+      if (card) card.classList.add('hidden');
+    }
   } catch (e) {
-    console.warn('背景載入常用連結失敗，維持預設連結：', e);
+    console.warn('背景載入常用連結失敗：', e);
+    if (card) card.classList.add('hidden');
   }
 }
 
