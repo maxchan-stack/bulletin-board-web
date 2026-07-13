@@ -2967,8 +2967,46 @@ async function initQuickLinks() {
       if (APP.adminSecret) {
         const titleInput = document.getElementById(`link-${i}-title-input`);
         const urlInput = document.getElementById(`link-${i}-url-input`);
-        if (titleInput) titleInput.value = (titleVal !== undefined ? titleVal.trim() : '');
-        if (urlInput) urlInput.value = (urlVal !== undefined ? urlVal.trim() : '');
+        if (titleInput) {
+          titleInput.value = (titleVal !== undefined ? titleVal.trim() : '');
+          const chineseMap = { 1: '一', 2: '二', 3: '三', 4: '四' };
+          titleInput.placeholder = `連結${chineseMap[i]}標題`;
+        }
+        if (urlInput) {
+          urlInput.value = (urlVal !== undefined ? urlVal.trim() : '');
+          const chineseMap = { 1: '一', 2: '二', 3: '三', 4: '四' };
+          urlInput.placeholder = `連結${chineseMap[i]}網址 (URL)`;
+        }
+      }
+    }
+
+    // 貼心 Fallback 邏輯：檢查是否有包含「行事曆」的常用資源，若無，且總連結數少於 4，自動將其作為預設項目附加
+    const hasCalendar = links.some(l => l.title.includes('行事曆') || l.title.toLowerCase().includes('calendar'));
+    if (!hasCalendar && links.length < 4) {
+      let emptyIdx = -1;
+      for (let i = 1; i <= 4; i++) {
+        const titleVal = config[`link_${i}_title`] ? config[`link_${i}_title`].trim() : '';
+        const urlVal = config[`link_${i}_url`] ? config[`link_${i}_url`].trim() : '';
+        if (!titleVal && !urlVal) {
+          emptyIdx = i;
+          break;
+        }
+      }
+
+      if (emptyIdx !== -1) {
+        links.push({
+          title: '學校行事曆',
+          url: 'https://maxchan-stack.github.io/bulletin-board-web/calendar.pdf'
+        });
+
+        // 若為管理員介面，為該空缺輸入欄位提供預設提示 placeholder
+        if (APP.adminSecret) {
+          const titleInput = document.getElementById(`link-${emptyIdx}-title-input`);
+          const urlInput = document.getElementById(`link-${emptyIdx}-url-input`);
+          const chineseMap = { 1: '一', 2: '二', 3: '三', 4: '四' };
+          if (titleInput) titleInput.placeholder = `連結${chineseMap[emptyIdx]}標題 (預設：學校行事曆)`;
+          if (urlInput) urlInput.placeholder = `連結${chineseMap[emptyIdx]}網址 (預設：./calendar.pdf)`;
+        }
       }
     }
 
