@@ -1293,8 +1293,7 @@
 <!-- Toast 容器 -->
 <div id="toast-container"></div>
 
-<!-- 隱藏 iframe（用於 Google Form 提交） -->
-<iframe name="hidden-submit-frame" style="display:none;" title="submit"></iframe>
+<!-- 隱藏 iframe（改為 API 發送後已廢棄） -->
 
 <!-- 月曆詳細資訊 Modal -->
 <div id="calendar-modal" class="modal" onclick="if(event.target===this) closeCalendarModal()">
@@ -1315,17 +1314,8 @@
 // ═══════════════════════════════════════════════════════
 const CONFIG = {
   SPREADSHEET_ID: '1p2Ii2M8dOGdBffuLe0hvE40P6qmfj4SS55uQ4_9bQrQ',
-  FORM_ID:        '1_GTG8t2-uI96uG7hi1d0IuTkUCk_kz_GTPC26Binxv0',
   RESPONSE_SHEET: '表單回覆 2',
   WEB_APP_URL:    'https://script.google.com/macros/s/AKfycbyXt1vNUGZVOiZrs88Z9Bp8XWun4WzV_YnZRFWGe3j7NENiKL9m02hJyfH_KJ_sB8P8/exec',
-  FORM_ENTRIES: {
-    category:   'entry.881129735',
-    subject:    'entry.511209487',
-    dueDate:    'entry.302347305',
-    content:    'entry.440674452',
-    posterName: 'entry.2075420315',
-    posterType: 'entry.1414592064'
-  },
   // 幹部職稱列表
   CADRE_TITLES: ['班長','副班長','學藝股長','風紀股長','衛生股長','體育股長','資訊股長','總務股長','環保股長'],
   // 小老師科目列表
@@ -2252,9 +2242,9 @@ function showAdminEdit() {
 }
 
 // ═══════════════════════════════════════════════════════
-//  發布公告（提交 Google Form 透過隱藏 iframe）
+//  發布公告（打後端 API + 驗證 PIN 碼）
 // ═══════════════════════════════════════════════════════
-function submitBulletin() {
+async function submitBulletin() {
   if (APP.isSubmitting) return;
   const category = document.getElementById('ed-category').value;
   const subject  = document.getElementById('ed-subject').value;
@@ -2272,59 +2262,61 @@ function submitBulletin() {
     return;
   }
 
-  // 檢查 CONFIG 是否已設定
-  if (CONFIG.FORM_ID === 'SETUP_REQUIRED') {
-    showStatusMsg('系統尚未完成設定，請聯繫管理員', 'error');
-    return;
-  }
-
   APP.isSubmitting = true;
   const btn = document.getElementById('btn-submit');
   btn.disabled = true; btn.textContent = '發布中…';
 
-  // 使用隱藏 form 提交（規避 CORS 限制）
-  const formUrl = `https://docs.google.com/forms/d/${CONFIG.FORM_ID}/formResponse`;
+  try {
+    const payload = {
+      action: 'publishAnnouncement',
+      adminSecret: APP.adminSecret,
+      pin: APP.verifiedPinVal,
+      category: category,
+      subject: subject,
+      dueDate: dueDate,
+      content: content,
+      posterName: APP.posterLabel,
+      posterType: APP.posterType
+    };
 
-  const hiddenForm = document.createElement('form');
-  hiddenForm.method  = 'POST';
-  hiddenForm.action  = formUrl;
-  hiddenForm.target  = 'hidden-submit-frame';
-  hiddenForm.style.display = 'none';
+    const response = await fetch(CONFIG.WEB_APP_URL, {
+      method: 'POST',
+      mode: 'cors',
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8'
+      },
+      body: JSON.stringify(payload)
+    });
 
-  const fields = {
-    [CONFIG.FORM_ENTRIES.category]:   category,
-    [CONFIG.FORM_ENTRIES.subject]:    subject,
-    [CONFIG.FORM_ENTRIES.dueDate]:    dueDate,
-    [CONFIG.FORM_ENTRIES.content]:    content,
-    [CONFIG.FORM_ENTRIES.posterName]: APP.posterLabel,
-    [CONFIG.FORM_ENTRIES.posterType]: APP.posterType
-  };
-
-  Object.entries(fields).forEach(([name, value]) => {
-    const inp = document.createElement('input');
-    inp.type = 'hidden'; inp.name = name; inp.value = value;
-    hiddenForm.appendChild(inp);
-  });
-
-  document.body.appendChild(hiddenForm);
-  hiddenForm.submit();
-
-  // 等待約 1.5 秒後回傳成功
-  setTimeout(() => {
-    document.body.removeChild(hiddenForm);
+    const result = await response.json();
+    if (result.success) {
+      showToast('公告發布成功', 'success');
+      showStatusMsg('公告已成功發布！公告欄將在幾分鐘內更新。', 'success');
+      
+      // 清除草稿暫存
+      clearAutosaveDraft();
+      resetEditorForm();
+      
+      // 重新整理發布歷史紀錄
+      initEditorPanel();
+    } else {
+      if (result.error === 'UNAUTHORIZED') {
+        showToast('驗證失敗：PIN 碼或管理密碼錯誤，請重新登入', 'error');
+        showStatusMsg('驗證失敗：PIN 碼或管理密碼錯誤，請重新登入', 'error');
+      } else {
+        showToast('發布失敗：' + (result.error || '未知錯誤'), 'error');
+        showStatusMsg('發布失敗：' + (result.error || '未知錯誤'), 'error');
+      }
+    }
+  } catch (e) {
+    showToast('網路連線失敗或權限不足', 'error');
+    showStatusMsg('發布失敗：網路錯誤或連線逾時，請重試', 'error');
+    console.error('Publish submit error:', e);
+  } finally {
     APP.isSubmitting = false;
-    btn.disabled = false; btn.textContent = '發布公告';
-    showStatusMsg('公告已成功發布！公告欄將在幾分鐘內更新。', 'success');
-    
-    // 清除草稿暫存
-    clearAutosaveDraft();
-    
-    resetEditorForm();
-    showToast('公告發布成功', 'success');
-    
-    // 重新整理發布歷史紀錄
-    initEditorPanel();
-  }, 1800);
+    btn.disabled = false;
+    btn.textContent = '發布公告';
+  }
 }
 
 function resetEditorForm() {
