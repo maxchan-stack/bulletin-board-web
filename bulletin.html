@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <!-- v32.1.1 幹部發布：apiCall POST+GET 備援、PIN 重驗、錯誤訊息 -->
+  <!-- v32.1.2 改接新 API 部署，修正 UNKNOWN_ACTION -->
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>高二甲班電子佈告欄</title>
@@ -1321,8 +1321,8 @@
 const CONFIG = {
   SPREADSHEET_ID: '1p2Ii2M8dOGdBffuLe0hvE40P6qmfj4SS55uQ4_9bQrQ',
   RESPONSE_SHEET: '表單回覆 2',
-  // 與 deploy.sh 的 DEPLOY_ID 必須一致
-  WEB_APP_URL:    'https://script.google.com/macros/s/AKfycbyXt1vNUGZVOiZrs88Z9Bp8XWun4WzV_YnZRFWGe3j7NENiKL9m02hJyfH_KJ_sB8P8/exec',
+  // 專用 API 部署（v32.1.2，含 publishAnnouncement；勿與舊版 UNKNOWN_ACTION 部署混用）
+  WEB_APP_URL:    'https://script.google.com/macros/s/AKfycbyQr4WjfdF_sNs7z1VyngP0rPxYJJEpGsp1i7dO_MHR5w5egCvJIjVMFavea_CnHHgPeA/exec',
   // 幹部職稱列表
   CADRE_TITLES: ['班長','副班長','學藝股長','風紀股長','衛生股長','體育股長','資訊股長','總務股長','環保股長'],
   // 小老師科目列表
