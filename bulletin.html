@@ -1420,7 +1420,20 @@ async function verifyAdminSecret(secret) {
       body: JSON.stringify({ action: 'verifyAdmin', adminSecret: secret })
     });
     const result = await response.json();
-    return !!(result && result.success);
+    if (result && result.success) return true;
+
+    // 後端尚未部署新 action 時：用既有 getPin 探測密鑰（相容舊 Web App 版本）
+    if (result && (result.error === 'UNKNOWN_ACTION' || result.error === 'PARSE_ERROR')) {
+      const r2 = await fetch(CONFIG.WEB_APP_URL, {
+        method: 'POST',
+        mode: 'cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'getPin', adminSecret: secret })
+      });
+      const j2 = await r2.json();
+      return !!(j2 && j2.success);
+    }
+    return false;
   } catch (e) {
     console.error('verifyAdminSecret error:', e);
     return false;
