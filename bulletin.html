@@ -1330,10 +1330,27 @@ const CONFIG = {
 };
 
 /**
- * 呼叫後端 API：先 POST，失敗（非 JSON / 網路）時改走 GET ?action=api&payload=
- * 解決部分環境 POST 被擋導致幹部「發布失敗」
+ * 呼叫後端 API：
+ * 0) 若頁面由 GAS HtmlService 開啟 → google.script.run（最穩）
+ * 1) 否則 POST
+ * 2) POST 失敗 → GET ?action=api&payload=
  */
 async function apiCall(body) {
+  // 0) google.script.run（僅當開啟 script.google.com Web App 頁面時可用）
+  if (typeof google !== 'undefined' && google.script && google.script.run && google.script.run.routeApiActionRaw) {
+    try {
+      const result = await new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler(resolve)
+          .withFailureHandler(reject)
+          .routeApiActionRaw(body);
+      });
+      if (result && typeof result === 'object') return result;
+    } catch (e) {
+      console.warn('google.script.run 失敗，改 HTTP', e);
+    }
+  }
+
   // 1) POST
   try {
     const response = await fetch(CONFIG.WEB_APP_URL, {
@@ -1356,27 +1373,31 @@ async function apiCall(body) {
 
   // 2) GET 備援
   const payload = encodeURIComponent(JSON.stringify(body));
-  // URL 過長時無法 GET（約 > 1800），回傳明確錯誤
   const url = `${CONFIG.WEB_APP_URL}?action=api&payload=${payload}`;
   if (url.length > 1800) {
     return {
       success: false,
       error: 'REQUEST_TOO_LONG',
-      detail: '內容過長且 POST 通道不可用，請縮短公告或聯繫導師檢查 Web App 部署'
+      detail: '內容過長且 POST 通道不可用，請縮短公告，或請導師重新部署 Web App'
     };
   }
-  const res2 = await fetch(url, { method: 'GET', mode: 'cors', cache: 'no-store', redirect: 'follow' });
-  const text2 = await res2.text();
   try {
-    return JSON.parse(text2);
-  } catch (e2) {
-    console.error('GET 備援也非 JSON', text2.slice(0, 200));
-    return {
-      success: false,
-      error: 'NETWORK_OR_DEPLOY',
-      detail: '無法連線後端 Web App（請導師重新「管理部署」並設為任何人可存取）'
-    };
+    const res2 = await fetch(url, { method: 'GET', mode: 'cors', cache: 'no-store', redirect: 'follow' });
+    const text2 = await res2.text();
+    try {
+      return JSON.parse(text2);
+    } catch (e2) {
+      console.error('GET 備援也非 JSON', text2.slice(0, 200));
+    }
+  } catch (e3) {
+    console.error('GET 備援失敗', e3);
   }
+
+  return {
+    success: false,
+    error: 'NETWORK_OR_DEPLOY',
+    detail: '無法連線後端。請用「無痕」重試；若仍失敗，請導師在 script.google.com → 部署 → 管理部署 → 新版本（執行身分：我、誰可以存取：任何人）'
+  };
 }
 
 // ═══════════════════════════════════════════════════════
