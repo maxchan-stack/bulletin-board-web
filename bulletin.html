@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <!-- v32.0.1 -->
+  <!-- v32.0.2 資源連結：公告欄可見 + 強制重抓設定 -->
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>高二甲班電子佈告欄</title>
@@ -1161,6 +1161,12 @@
     </div>
 
     <div id="bulletin-list"></div>
+
+    <!-- 常用資源（公告欄頁也要顯示，否則學生進入後看不到導師改的連結） -->
+    <div class="resources-card hidden" id="board-resources-card" style="margin-top: 20px;">
+      <div class="resources-title">常用資源</div>
+      <div class="resources-grid" id="board-resources-list-container"></div>
+    </div>
   </div>
 
   <!-- Page: Edit 發布公告 -->
@@ -1776,14 +1782,21 @@ async function verifyRolePin() {
 let CONFIG_CACHE = null;
 let CONFIG_PROMISE = null;
 
-async function fetchConfig() {
+/** @param {boolean} forceRefresh 為 true 時略過記憶體快取，重新向試算表抓設定 */
+async function fetchConfig(forceRefresh = false) {
+  if (forceRefresh) {
+    CONFIG_CACHE = null;
+    CONFIG_PROMISE = null;
+  }
   if (CONFIG_CACHE) return CONFIG_CACHE;
   if (CONFIG_PROMISE) return CONFIG_PROMISE;
 
   CONFIG_PROMISE = (async () => {
     try {
-      const url = `https://docs.google.com/spreadsheets/d/${CONFIG.SPREADSHEET_ID}/gviz/tq?tqx=out:json&sheet=config&nocache=${Date.now()}`;
-      const res = await fetch(url);
+      // 雙重防快取：時間戳 + 隨機碼（gviz 有時會忽略單一 query）
+      const bust = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const url = `https://docs.google.com/spreadsheets/d/${CONFIG.SPREADSHEET_ID}/gviz/tq?tqx=out:json&sheet=config&headers=0&tq=${encodeURIComponent('select *')}&cachebust=${bust}`;
+      const res = await fetch(url, { cache: 'no-store' });
       const text = await res.text();
       const match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/);
       if (!match) throw new Error('無法解析 config 工作表');
@@ -1798,7 +1811,10 @@ async function fetchConfig() {
           // 不要在前端快取中透露任何 PIN 資訊 (包含第一列 A1 若為獨立數值的情況)
           if (key === 'pin') return;
           if (idx === 0 && /^\d+$/.test(key)) return; // 若第一列 A1 是純數字，通常是手動輸入的 PIN，過濾不載入
-          const val = cells[1]?.v !== null && cells[1]?.v !== undefined ? String(cells[1].v).trim() : '';
+          // gviz 對空儲存格常回 null；字串有時在 .f 欄
+          let raw = cells[1]?.v;
+          if (raw === null || raw === undefined) raw = cells[1]?.f;
+          const val = raw !== null && raw !== undefined ? String(raw).trim() : '';
           config[key] = val;
         }
       });
@@ -1844,6 +1860,14 @@ async function loadBoard(forceRefresh = false) {
   updateHeader();
   const now = new Date();
   document.getElementById('board-date').textContent = `${now.getFullYear()} 年 ${now.getMonth()+1} 月 ${now.getDate()} 日`;
+
+  // 進入／重整公告欄時先強制重抓 config，再更新連結／倒數（避免並行競態吃到舊快取）
+  fetchConfig(true)
+    .then(() => Promise.all([initQuickLinks(false), initCountdownBanner()]))
+    .catch(() => {
+      initQuickLinks(true).catch(() => {});
+      initCountdownBanner().catch(() => {});
+    });
 
   const hasCache = !!BULLETINS_CACHE;
   if (forceRefresh || !hasCache) {
@@ -2921,6 +2945,7 @@ async function deleteCountdownConfig() {
 }
 
 function renderQuickLinksGrid(container, links) {
+  if (!container) return;
   container.innerHTML = '';
   if (links.length === 0) {
     container.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; font-size: 0.77rem; color: var(--c-text-dim); padding: 8px 0;">未設定任何資源連結</div>';
@@ -2930,28 +2955,44 @@ function renderQuickLinksGrid(container, links) {
     const btn = document.createElement('a');
     btn.href = link.url;
     btn.target = '_blank';
+    btn.rel = 'noopener noreferrer';
     btn.className = 'resource-btn';
     btn.textContent = link.title;
     container.appendChild(btn);
   });
 }
 
-async function initQuickLinks() {
-  const container = document.getElementById('resources-list-container');
-  if (!container) return;
+/**
+ * 載入並渲染常用資源連結
+ * @param {boolean} forceRefresh 強制略過前端快取、重抓試算表
+ */
+async function initQuickLinks(forceRefresh = true) {
+  const containers = [
+    document.getElementById('resources-list-container'),
+    document.getElementById('board-resources-list-container')
+  ].filter(Boolean);
+  const cards = [
+    document.getElementById('resources-card'),
+    document.getElementById('board-resources-card')
+  ].filter(Boolean);
 
-  const card = document.getElementById('resources-card');
+  if (containers.length === 0) return;
 
   try {
-    const config = await fetchConfig();
+    // 預設強制重抓，避免導師改完後其他人重整仍吃到舊記憶體／gviz 快取
+    const config = await fetchConfig(forceRefresh);
     const links = [];
     for (let i = 1; i <= 4; i++) {
       const titleVal = config[`link_${i}_title`];
       const urlVal = config[`link_${i}_url`];
 
-      const finalTitle = titleVal ? titleVal.trim() : '';
-      const finalUrl = urlVal ? urlVal.trim() : '';
-      
+      const finalTitle = titleVal ? String(titleVal).trim() : '';
+      let finalUrl = urlVal ? String(urlVal).trim() : '';
+      // 自動補 https://（使用者常只填域名）
+      if (finalUrl && !/^https?:\/\//i.test(finalUrl) && !finalUrl.startsWith('/') && !finalUrl.startsWith('#')) {
+        finalUrl = 'https://' + finalUrl;
+      }
+
       if (finalTitle && finalUrl) {
         links.push({ title: finalTitle, url: finalUrl });
       }
@@ -2959,74 +3000,72 @@ async function initQuickLinks() {
       if (APP.adminSecret) {
         const titleInput = document.getElementById(`link-${i}-title-input`);
         const urlInput = document.getElementById(`link-${i}-url-input`);
+        const chineseMap = { 1: '一', 2: '二', 3: '三', 4: '四' };
         if (titleInput) {
-          titleInput.value = (titleVal !== undefined ? titleVal.trim() : '');
-          const chineseMap = { 1: '一', 2: '二', 3: '三', 4: '四' };
+          titleInput.value = finalTitle;
           titleInput.placeholder = `連結${chineseMap[i]}標題`;
         }
         if (urlInput) {
-          urlInput.value = (urlVal !== undefined ? urlVal.trim() : '');
-          const chineseMap = { 1: '一', 2: '二', 3: '三', 4: '四' };
+          urlInput.value = urlVal ? String(urlVal).trim() : '';
           urlInput.placeholder = `連結${chineseMap[i]}網址 (URL)`;
         }
       }
     }
 
-    // 貼心 Fallback 邏輯：檢查是否有包含「行事曆」的常用資源，若無，且總連結數少於 4，自動將其作為預設項目附加
-    const hasCalendar = links.some(l => l.title.includes('行事曆') || l.title.toLowerCase().includes('calendar'));
-    if (!hasCalendar && links.length < 4) {
-      let emptyIdx = -1;
-      for (let i = 1; i <= 4; i++) {
-        const titleVal = config[`link_${i}_title`] ? config[`link_${i}_title`].trim() : '';
-        const urlVal = config[`link_${i}_url`] ? config[`link_${i}_url`].trim() : '';
-        if (!titleVal && !urlVal) {
-          emptyIdx = i;
-          break;
-        }
-      }
-
-      if (emptyIdx !== -1) {
-        links.push({
-          title: '學校行事曆',
-          url: 'https://maxchan-stack.github.io/bulletin-board-web/calendar.pdf'
-        });
-
-        // 若為管理員介面，為該空缺輸入欄位提供預設提示 placeholder
-        if (APP.adminSecret) {
-          const titleInput = document.getElementById(`link-${emptyIdx}-title-input`);
-          const urlInput = document.getElementById(`link-${emptyIdx}-url-input`);
-          const chineseMap = { 1: '一', 2: '二', 3: '三', 4: '四' };
-          if (titleInput) titleInput.placeholder = `連結${chineseMap[emptyIdx]}標題 (預設：學校行事曆)`;
-          if (urlInput) urlInput.placeholder = `連結${chineseMap[emptyIdx]}網址 (預設：./calendar.pdf)`;
-        }
+    // 僅在「完全沒有任何自訂連結」時才顯示預設行事曆，避免蓋掉導師設定的觀感
+    if (links.length === 0) {
+      links.push({
+        title: '學校行事曆',
+        url: 'https://maxchan-stack.github.io/bulletin-board-web/calendar.pdf'
+      });
+      if (APP.adminSecret) {
+        const titleInput = document.getElementById('link-1-title-input');
+        const urlInput = document.getElementById('link-1-url-input');
+        if (titleInput && !titleInput.value) titleInput.placeholder = '連結一標題 (預設：學校行事曆)';
+        if (urlInput && !urlInput.value) urlInput.placeholder = '連結一網址 (可填行事曆 PDF)';
       }
     }
 
-    if (links.length > 0) {
-      renderQuickLinksGrid(container, links);
-      if (card) card.classList.remove('hidden');
-    } else {
-      if (card) card.classList.add('hidden');
-    }
+    containers.forEach(c => renderQuickLinksGrid(c, links));
+    cards.forEach(card => {
+      if (links.length > 0) card.classList.remove('hidden');
+      else card.classList.add('hidden');
+    });
   } catch (e) {
     console.warn('背景載入常用連結失敗：', e);
-    if (card) card.classList.add('hidden');
+    cards.forEach(card => card.classList.add('hidden'));
   }
 }
 
 async function saveLinksConfig() {
+  if (!APP.adminSecret) {
+    showToast('錯誤：缺少管理員金鑰，請用導師專用連結進入', 'error');
+    return;
+  }
+
   const payload = {
     action: 'updateLinks',
     adminSecret: APP.adminSecret
   };
 
   for (let i = 1; i <= 4; i++) {
-    const title = document.getElementById(`link-${i}-title-input`).value.trim();
-    const url = document.getElementById(`link-${i}-url-input`).value.trim();
-    
+    const titleEl = document.getElementById(`link-${i}-title-input`);
+    const urlEl = document.getElementById(`link-${i}-url-input`);
+    const title = titleEl ? titleEl.value.trim() : '';
+    let url = urlEl ? urlEl.value.trim() : '';
+
     if (title && !url) {
       showToast(`請為連結 ${i}【${title}】填寫對應的網址 (URL)`, 'error');
       return;
+    }
+    if (url && !title) {
+      showToast(`請為連結 ${i} 填寫標題`, 'error');
+      return;
+    }
+    // 寫入前正規化網址
+    if (url && !/^https?:\/\//i.test(url) && !url.startsWith('/') && !url.startsWith('#')) {
+      url = 'https://' + url;
+      if (urlEl) urlEl.value = url;
     }
 
     payload[`title${i}`] = title;
@@ -3049,14 +3088,11 @@ async function saveLinksConfig() {
 
     const result = await response.json();
     if (result.success) {
-      showToast('資源連結設定成功', 'success');
-      if (!CONFIG_CACHE) CONFIG_CACHE = {};
-      for (let i = 1; i <= 4; i++) {
-        CONFIG_CACHE[`link_${i}_title`] = payload[`title${i}`];
-        CONFIG_CACHE[`link_${i}_url`] = payload[`url${i}`];
-      }
-      CONFIG_PROMISE = Promise.resolve(CONFIG_CACHE);
-      await initQuickLinks();
+      showToast('資源連結已寫入試算表，其他人重新整理即可看到', 'success');
+      // 清快取後強制重抓，確認與試算表一致
+      CONFIG_CACHE = null;
+      CONFIG_PROMISE = null;
+      await initQuickLinks(true);
     } else {
       showToast('儲存失敗：' + (result.error || '未知錯誤'), 'error');
     }
