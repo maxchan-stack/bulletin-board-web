@@ -2457,9 +2457,20 @@ async function submitBulletin() {
         saveRole();
         showToast('驗證失敗：請重新輸入授權碼', 'error');
         showStatusMsg('驗證失敗：PIN 錯誤或已失效，請回身份頁重新驗證', 'error');
+      } else if (err === 'UNKNOWN_ACTION') {
+        showToast('後端版本過舊（UNKNOWN_ACTION）', 'error');
+        showStatusMsg(
+          '發布失敗：UNKNOWN_ACTION（線上 Web App 沒有 publish 動作）。請導師用學校帳號開啟授權頁完成一次授權：' +
+          'https://maxchan-stack.github.io/bulletin-board-web/authorize-api.html',
+          'error'
+        );
       } else if (err === 'NETWORK_OR_DEPLOY' || err === 'REQUEST_TOO_LONG') {
         showToast('發布失敗：後端連線異常', 'error');
-        showStatusMsg('發布失敗：' + err + detail + '。請導師在 script.google.com 重新部署 Web App（任何人可存取）。', 'error');
+        showStatusMsg(
+          '發布失敗：' + err + detail +
+          '。請導師開啟 https://maxchan-stack.github.io/bulletin-board-web/authorize-api.html 完成 API 授權。',
+          'error'
+        );
       } else {
         showToast('發布失敗：' + err, 'error');
         showStatusMsg('發布失敗：' + err + detail, 'error');
