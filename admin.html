@@ -366,7 +366,13 @@
           // 切換按鈕狀態至階段 2
           step = 2;
           btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> 儲存並更新授權碼';
-          showMsg('管理驗證成功，已讀取目前設定', 'success');
+          if (result.weak || result.pin === '1234') {
+            showMsg('管理驗證成功。⚠️ 目前 PIN 過於簡單（如 1234），請立即改為 4–8 位數字（不可用 1234）', 'error');
+          } else if (result.warning === 'PIN_NOT_SET' || !result.pin) {
+            showMsg('管理驗證成功，但尚未設定 PIN，請立刻設定', 'error');
+          } else {
+            showMsg('管理驗證成功，已讀取目前設定', 'success');
+          }
         } else {
           showMsg('管理密鑰錯誤，請重新輸入', 'error');
           secretInput.value = '';
@@ -421,7 +427,8 @@
           newPinInput.value = '';
           showMsg('授權碼已成功更新並寫入雲端試算表！', 'success');
         } else {
-          showMsg('修改失敗：' + (result.error || '未知的後端錯誤'), 'error');
+          const detail = result.detail ? `（${result.detail}）` : '';
+          showMsg('修改失敗：' + (result.error || '未知的後端錯誤') + detail, 'error');
         }
       } catch (err) {
         showMsg('連線失敗，請確認網路狀態', 'error');

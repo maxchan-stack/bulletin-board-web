@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <!-- v32.0.2 資源連結：公告欄可見 + 強制重抓設定 -->
+  <!-- v32.1.0 P0-P2 修復：admin 驗證、公告ID、類別統一、部署對齊 -->
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>高二甲班電子佈告欄</title>
@@ -1346,6 +1346,7 @@ const APP = {
   currentMonth:  new Date().getMonth(), // 0 = 1月, 11 = 12月
   isEditing:     false,  // 是否處於編輯舊公告狀態
   editingTimestamp: null, // 被編輯公告的時間戳記
+  editingRowId:  null,   // 被編輯公告的穩定 ID
   verifiedPinVal: null   // 暫存驗證過的 PIN 碼用於後續編輯與隱藏驗證
 };
 
@@ -1382,21 +1383,78 @@ function clearSavedRoleAndGoBack() {
   goToRolePage();
 }
 
-// 判斷公告是否已過期
+// 判斷公告是否已過期（YYYY-MM-DD 用本地日期解析，避免 UTC 差一天）
+function parseLocalDate(dateStr) {
+  if (!dateStr) return null;
+  const s = String(dateStr).trim();
+  const m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
+}
+
 function isExpired(b) {
   if (!b.dueDate) return false;
   const today = new Date();
   today.setHours(0,0,0,0);
-  const due = new Date(b.dueDate);
+  const due = parseLocalDate(b.dueDate);
+  if (!due) return false;
   due.setHours(0,0,0,0);
   return due < today;
+}
+
+function normalizeCategoryClient(cat) {
+  const c = String(cat || '').trim();
+  if (c === '交代事項') return '老師交代事項';
+  return c;
+}
+
+/** 驗證導師密鑰（必須後端通過才進入管理 UI） */
+async function verifyAdminSecret(secret) {
+  if (!secret) return false;
+  try {
+    const response = await fetch(CONFIG.WEB_APP_URL, {
+      method: 'POST',
+      mode: 'cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'verifyAdmin', adminSecret: secret })
+    });
+    const result = await response.json();
+    return !!(result && result.success);
+  } catch (e) {
+    console.error('verifyAdminSecret error:', e);
+    return false;
+  }
+}
+
+function enterTeacherMode(adminSecret) {
+  APP.role = 'editor';
+  APP.posterType = 'teacher';
+  APP.posterLabel = '導師';
+  APP.verifiedPin = true;
+  APP.adminSecret = adminSecret;
+  updateHeader();
+  showPage('edit');
+  document.getElementById('selected-poster-text').textContent = '導師';
+  document.getElementById('editor-verified-label').textContent = '導師';
+  document.getElementById('poster-display-name').textContent = '導師';
+  document.getElementById('teacher-panel').classList.remove('hidden');
+  document.getElementById('teacher-sheet-link').href =
+    `https://docs.google.com/spreadsheets/d/${CONFIG.SPREADSHEET_ID}/edit`;
+  setEditorDefaultDate();
+  saveRole();
+  initEditorPanel();
+  initCountdownBanner();
+  initQuickLinks(true);
+  initMarqueeData();
+  hideLoading();
 }
 
 // ═══════════════════════════════════════════════════════
 //  初始化
 // ═══════════════════════════════════════════════════════
-window.addEventListener('DOMContentLoaded', () => {
-  // 管理後台：URL 包含 ?admin=XXX 時，支援 GAS Web App 與網頁直接讀取
+window.addEventListener('DOMContentLoaded', async () => {
+  // 管理後台：URL 含 ?admin= 時，必須後端驗證通過才進入導師模式
   const urlParams = new URLSearchParams(window.location.search);
   let adminSecret = urlParams.get('admin');
   if (!adminSecret && window.GAS_PARAMS && window.GAS_PARAMS.admin) {
@@ -1404,90 +1462,81 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   if (adminSecret) {
-    APP.role = 'editor';
-    APP.posterType = 'teacher';
-    APP.posterLabel = '導師';
-    APP.verifiedPin = true;
-    APP.adminSecret = adminSecret; // 儲存管理員金鑰
-    updateHeader();
-    showPage('edit');
-    document.getElementById('selected-poster-text').textContent = '導師';
-    document.getElementById('editor-verified-label').textContent = '導師';
-    document.getElementById('teacher-panel').classList.remove('hidden');
-    document.getElementById('teacher-sheet-link').href =
-      `https://docs.google.com/spreadsheets/d/${CONFIG.SPREADSHEET_ID}/edit`;
-    setEditorDefaultDate();
-    initCountdownBanner();
-    initQuickLinks();
-    initMarqueeData();
-    return;
+    document.getElementById('page-loading')?.classList.remove('hidden');
+    const ok = await verifyAdminSecret(adminSecret);
+    if (ok) {
+      enterTeacherMode(adminSecret);
+      return;
+    }
+    // 密鑰錯誤：清掉 URL 參數與本機快取，回身份頁
+    showToast('導師密鑰無效，已返回一般模式', 'error');
+    clearSavedRole();
+    const clean = new URL(window.location.href);
+    clean.searchParams.delete('admin');
+    window.history.replaceState({}, '', clean.toString());
   }
+
   populateRoleSelects();
 
   // 嘗試從 localStorage 還原上次選擇的角色
   const saved = getSavedRole();
   if (saved && saved.role) {
+    // 若本機記的是導師，重新向後端驗證密鑰
+    if (saved.posterLabel === '導師' && saved.adminSecret) {
+      const ok = await verifyAdminSecret(saved.adminSecret);
+      if (ok) {
+        enterTeacherMode(saved.adminSecret);
+        return;
+      }
+      clearSavedRole();
+    } else if (saved.role === 'editor' && saved.adminSecret) {
+      // 舊快取若誤存 adminSecret 但不是導師標籤，仍驗證一次
+      const ok = await verifyAdminSecret(saved.adminSecret);
+      if (ok) {
+        enterTeacherMode(saved.adminSecret);
+        return;
+      }
+      clearSavedRole();
+    }
+
     APP.role = saved.role;
     APP.posterType = saved.posterType;
     APP.posterLabel = saved.posterLabel || '';
     APP.posterSubject = saved.posterSubject || '';
     APP.verifiedPin = saved.verifiedPin || false;
     APP.verifiedPinVal = saved.verifiedPinVal || null;
+    APP.adminSecret = null; // 非導師不保留密鑰
     updateHeader();
     hideLoading();
 
     if (saved.role === 'viewer') {
-      // 先直接載入公告欄視圖，防止卡在空白狀態，並於背景拉取公告
-      loadBoard();
-      initCountdownBanner();
-      initQuickLinks();
+      loadBoard(true);
       initMarqueeData();
       hideLoading();
-
-      // 在背景進行靜默更新
-      Promise.all([
-        fetchBulletins(true),
-        fetchConfig()
-      ]).then(() => {
-        // 更新完後重新整理視圖
-        loadBoard(false);
-        initCountdownBanner();
-        initQuickLinks();
-      }).catch(err => {
-        console.warn('背景更新失敗：', err);
-      });
     } else if (saved.role === 'editor' && saved.verifiedPin) {
-      APP.adminSecret = saved.adminSecret || null; // 還原管理員金鑰
       showPage('edit');
       setEditorDefaultDate();
       if (APP.posterSubject) document.getElementById('ed-subject').value = APP.posterSubject;
       document.getElementById('selected-poster-text').textContent = APP.posterLabel;
       document.getElementById('editor-verified-label').textContent = APP.posterLabel;
       document.getElementById('poster-display-name').textContent = APP.posterLabel;
-      
-      // 如果還原的是導師角色，則打開導師控制面板與填入試算表網址
-      if (APP.posterLabel === '導師') {
-        document.getElementById('teacher-panel').classList.remove('hidden');
-        document.getElementById('teacher-sheet-link').href =
-          `https://docs.google.com/spreadsheets/d/${CONFIG.SPREADSHEET_ID}/edit`;
-      }
-      
+      document.getElementById('teacher-panel').classList.add('hidden');
       initEditorPanel();
-      initCountdownBanner(); // 同步初始化倒數計時器
-      initQuickLinks();     // 同步初始化連結
-      initMarqueeData();    // 同步初始化跑馬燈
+      initCountdownBanner();
+      initQuickLinks(true);
+      initMarqueeData();
     } else {
       showPage('role');
-      setRolePageDate(); // 立即渲染本地日期與預設課表
-      initMarqueeData(); // 立即載入跑馬燈
+      setRolePageDate();
+      initMarqueeData();
       hideLoading();
     }
     return;
   }
 
   showPage('role');
-  setRolePageDate(); // 立即渲染本地日期與預設課表
-  initMarqueeData(); // 立即載入跑馬燈
+  setRolePageDate();
+  initMarqueeData();
   hideLoading();
 });
 
@@ -1792,8 +1841,20 @@ async function fetchConfig(forceRefresh = false) {
   if (CONFIG_PROMISE) return CONFIG_PROMISE;
 
   CONFIG_PROMISE = (async () => {
+    // 優先走 Web App（較不易被 gviz CDN 快取）
     try {
-      // 雙重防快取：時間戳 + 隨機碼（gviz 有時會忽略單一 query）
+      const apiUrl = `${CONFIG.WEB_APP_URL}?action=getPublicConfig&_=${Date.now()}`;
+      const apiRes = await fetch(apiUrl, { cache: 'no-store' });
+      const apiJson = await apiRes.json();
+      if (apiJson && apiJson.success && apiJson.config) {
+        CONFIG_CACHE = apiJson.config;
+        return CONFIG_CACHE;
+      }
+    } catch (e) {
+      console.warn('getPublicConfig 失敗，改走 gviz：', e);
+    }
+
+    try {
       const bust = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       const url = `https://docs.google.com/spreadsheets/d/${CONFIG.SPREADSHEET_ID}/gviz/tq?tqx=out:json&sheet=config&headers=0&tq=${encodeURIComponent('select *')}&cachebust=${bust}`;
       const res = await fetch(url, { cache: 'no-store' });
@@ -1808,10 +1869,8 @@ async function fetchConfig(forceRefresh = false) {
         const cells = row.c || [];
         if (cells[0]?.v !== null && cells[0]?.v !== undefined) {
           const key = String(cells[0].v).toLowerCase().trim();
-          // 不要在前端快取中透露任何 PIN 資訊 (包含第一列 A1 若為獨立數值的情況)
-          if (key === 'pin') return;
-          if (idx === 0 && /^\d+$/.test(key)) return; // 若第一列 A1 是純數字，通常是手動輸入的 PIN，過濾不載入
-          // gviz 對空儲存格常回 null；字串有時在 .f 欄
+          if (key === 'pin' || key === 'key') return;
+          if (idx === 0 && /^\d+$/.test(key)) return;
           let raw = cells[1]?.v;
           if (raw === null || raw === undefined) raw = cells[1]?.f;
           const val = raw !== null && raw !== undefined ? String(raw).trim() : '';
@@ -1823,7 +1882,7 @@ async function fetchConfig(forceRefresh = false) {
       return config;
     } catch (e) {
       console.error('fetchConfig error:', e);
-      CONFIG_PROMISE = null; // 發生錯誤時重置，以便後續可以重試
+      CONFIG_PROMISE = null;
       throw e;
     }
   })();
@@ -1923,7 +1982,8 @@ function isToday(dateStr) {
   if (!dateStr) return false;
   const today = new Date();
   today.setHours(0,0,0,0);
-  const d = new Date(dateStr);
+  const d = parseLocalDate(dateStr);
+  if (!d) return false;
   d.setHours(0,0,0,0);
   return today.getTime() === d.getTime();
 }
@@ -1933,7 +1993,8 @@ function isTomorrow(dateStr) {
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   tomorrow.setHours(0,0,0,0);
-  const d = new Date(dateStr);
+  const d = parseLocalDate(dateStr);
+  if (!d) return false;
   d.setHours(0,0,0,0);
   return tomorrow.getTime() === d.getTime();
 }
@@ -1961,14 +2022,16 @@ async function fetchBulletins(forceRefresh = false) {
   if (!data.table) return [];
 
   const rows = data.table.rows || [];
-  // 欄位順序（Google Form 回應表）：
-  // 0:Timestamp 1:類別 2:科目 3:截止日期 4:內容 5:發布者 6:角色 7:狀態
+  // 欄位：0時間 1類別 2科目 3截止 4內容 5發布者 6角色 7狀態 8跑馬燈 9公告ID
   const list = rows.map((row, i) => {
     const c = row.c || [];
     const getVal = (idx) => {
       const cell = c[idx];
-      if (!cell || cell.v === null || cell.v === undefined) return '';
-      // Google gviz date format: Date(y,m,d) -> 0-based month, 支援時間戳記解析
+      if (!cell || cell.v === null || cell.v === undefined) {
+        if (cell && cell.f != null) return String(cell.f);
+        return '';
+      }
+      // Google gviz date format: Date(y,m,d) -> 0-based month
       if (typeof cell.v === 'string' && cell.v.startsWith('Date(')) {
         const m = cell.v.match(/Date\((\d+),(\d+),(\d+)(?:,(\d+),(\d+),(\d+))?/);
         if (m) {
@@ -1989,18 +2052,19 @@ async function fetchBulletins(forceRefresh = false) {
     return {
       id:         i,
       timestamp:  getVal(0),
-      category:   getVal(1),
+      category:   normalizeCategoryClient(getVal(1)),
       subject:    getVal(2),
       dueDate:    getVal(3),
       content:    getVal(4),
       posterName: getVal(5),
       posterType:    getVal(6),
       status:        getVal(7),
-      marqueeStatus: getVal(8)
+      marqueeStatus: getVal(8),
+      rowId:         getVal(9)
     };
   })
   .filter(b => b.content && b.status !== '隱藏')
-  .reverse(); // 最新的排最前
+  .reverse();
 
   BULLETINS_CACHE = list;
   return list;
@@ -2135,11 +2199,11 @@ function renderBulletinList(list) {
         const btnText = isMarquee ? '🔇 關閉跑馬燈' : '📢 開啟跑馬燈';
         const btnClass = isMarquee ? 'btn-ghost' : 'btn-primary';
         const nextStatus = isMarquee ? 'no_marquee' : 'marquee';
-        marqueeBtnHTML = `<button class="btn ${btnClass} btn-sm" onclick="toggleMarquee('${b.timestamp}', '${nextStatus}', event)" style="padding: 4px 10px; font-size: 0.72rem; display: inline-flex; align-items: center; gap: 4px; border-radius: var(--radius-sm); margin-right: 6px;">${btnText}</button>`;
+        marqueeBtnHTML = `<button class="btn ${btnClass} btn-sm" onclick="toggleMarquee('${b.timestamp}', '${nextStatus}', event, '${b.rowId || ''}')" style="padding: 4px 10px; font-size: 0.72rem; display: inline-flex; align-items: center; gap: 4px; border-radius: var(--radius-sm); margin-right: 6px;">${btnText}</button>`;
       }
       adminControlsHTML = `<div style="margin-left: auto; display: flex; align-items: center;">
         ${marqueeBtnHTML}
-        <button class="btn btn-danger btn-sm" onclick="deleteAnnouncement('${b.timestamp}', event)" style="padding: 4px 10px; font-size: 0.72rem; display: inline-flex; align-items: center; gap: 4px; border-radius: var(--radius-sm);">🗑️ 隱藏</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteAnnouncement('${b.timestamp}', event, '${b.rowId || ''}')" style="padding: 4px 10px; font-size: 0.72rem; display: inline-flex; align-items: center; gap: 4px; border-radius: var(--radius-sm);">🗑️ 隱藏</button>
       </div>`;
     }
 
@@ -2185,7 +2249,7 @@ function toggleCardContent(btn) {
   }
 }
 
-async function deleteAnnouncement(timestamp, event) {
+async function deleteAnnouncement(timestamp, event, rowId) {
   if (event) event.stopPropagation();
   if (!confirm('確定要將此公告從佈告欄中隱藏嗎？')) return;
 
@@ -2198,6 +2262,7 @@ async function deleteAnnouncement(timestamp, event) {
       pin: APP.verifiedPinVal,
       posterName: APP.posterLabel,
       timestamp: timestamp,
+      rowId: rowId || '',
       status: 'hidden'
     };
 
@@ -2213,7 +2278,8 @@ async function deleteAnnouncement(timestamp, event) {
     const result = await response.json();
     if (result.success) {
       showToast('公告已成功隱藏', 'success');
-      loadBoard(); // 重新整理佈告欄
+      BULLETINS_CACHE = null;
+      loadBoard(true);
     } else {
       showToast('操作失敗：' + (result.error || '未知錯誤'), 'error');
     }
@@ -2223,7 +2289,7 @@ async function deleteAnnouncement(timestamp, event) {
   }
 }
 
-async function toggleMarquee(timestamp, nextStatus, event) {
+async function toggleMarquee(timestamp, nextStatus, event, rowId) {
   if (event) event.stopPropagation();
   showToast('正在設定跑馬燈狀態...', 'info');
 
@@ -2232,6 +2298,7 @@ async function toggleMarquee(timestamp, nextStatus, event) {
       action: 'updateMarquee',
       adminSecret: APP.adminSecret,
       timestamp: timestamp,
+      rowId: rowId || '',
       marqueeStatus: nextStatus
     };
 
@@ -2247,7 +2314,8 @@ async function toggleMarquee(timestamp, nextStatus, event) {
     const result = await response.json();
     if (result.success) {
       showToast('已更新跑馬燈設定', 'success');
-      loadBoard(); // 重新整理佈告欄
+      BULLETINS_CACHE = null;
+      loadBoard(true);
     } else {
       showToast('設定失敗：' + (result.error || '未知錯誤'), 'error');
     }
@@ -2295,7 +2363,7 @@ async function submitBulletin() {
       action: 'publishAnnouncement',
       adminSecret: APP.adminSecret,
       pin: APP.verifiedPinVal,
-      category: category,
+      category: normalizeCategoryClient(category),
       subject: subject,
       dueDate: dueDate,
       content: content,
@@ -2315,11 +2383,12 @@ async function submitBulletin() {
     const result = await response.json();
     if (result.success) {
       showToast('公告發布成功', 'success');
-      showStatusMsg('公告已成功發布！公告欄將在幾分鐘內更新。', 'success');
+      showStatusMsg('公告已成功發布！請重新整理公告欄查看。', 'success');
       
-      // 清除草稿暫存
+      // 清除草稿暫存與公告快取
       clearAutosaveDraft();
       resetEditorForm();
+      BULLETINS_CACHE = null;
       
       // 重新整理發布歷史紀錄
       initEditorPanel();
@@ -2657,8 +2726,8 @@ async function loadEditorHistory() {
         </div>
         <div class="history-content">${safeContent}</div>
         <div class="history-btns">
-          <button class="btn btn-ghost btn-sm" onclick="startEditMode('${b.timestamp}', '${b.category}', '${b.subject}', '${b.dueDate}', \`${safeContent.replace(/`/g, '\\`').replace(/\n/g, '\\n')}\`)">修改內容</button>
-          ${isHidden ? '' : `<button class="btn btn-danger btn-sm" onclick="deleteAnnouncement('${b.timestamp}', event)">隱藏公告</button>`}
+          <button class="btn btn-ghost btn-sm" onclick="startEditMode('${b.timestamp}', '${b.category}', '${b.subject}', '${b.dueDate}', \`${safeContent.replace(/`/g, '\\`').replace(/\n/g, '\\n')}\`, '${b.rowId || ''}')">修改內容</button>
+          ${isHidden ? '' : `<button class="btn btn-danger btn-sm" onclick="deleteAnnouncement('${b.timestamp}', event, '${b.rowId || ''}')">隱藏公告</button>`}
         </div>
       `;
       container.appendChild(item);
@@ -2669,9 +2738,10 @@ async function loadEditorHistory() {
   }
 }
 
-function startEditMode(timestamp, category, subject, dueDate, content) {
+function startEditMode(timestamp, category, subject, dueDate, content, rowId) {
   APP.isEditing = true;
   APP.editingTimestamp = timestamp;
+  APP.editingRowId = rowId || '';
 
   document.querySelector('.editor-card-title').textContent = '編輯公告';
   document.getElementById('editor-verified-label').textContent = `${APP.posterLabel} (編輯模式)`;
@@ -2695,6 +2765,7 @@ function startEditMode(timestamp, category, subject, dueDate, content) {
 function cancelEditMode() {
   APP.isEditing = false;
   APP.editingTimestamp = null;
+  APP.editingRowId = null;
 
   document.querySelector('.editor-card-title').textContent = '新增公告';
   document.getElementById('editor-verified-label').textContent = APP.posterLabel;
@@ -2716,7 +2787,8 @@ async function submitEditedBulletin(category, subject, dueDate, content) {
       adminSecret: APP.adminSecret,
       pin: APP.verifiedPinVal,
       timestamp: APP.editingTimestamp,
-      category: category,
+      rowId: APP.editingRowId || '',
+      category: normalizeCategoryClient(category),
       subject: subject,
       dueDate: dueDate,
       content: content,
