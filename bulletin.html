@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <!-- v32.1.0 P0-P2 修復：admin 驗證、公告ID、類別統一、部署對齊 -->
+  <!-- v32.1.1 幹部發布：apiCall POST+GET 備援、PIN 重驗、錯誤訊息 -->
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>高二甲班電子佈告欄</title>
@@ -1321,12 +1321,63 @@
 const CONFIG = {
   SPREADSHEET_ID: '1p2Ii2M8dOGdBffuLe0hvE40P6qmfj4SS55uQ4_9bQrQ',
   RESPONSE_SHEET: '表單回覆 2',
+  // 與 deploy.sh 的 DEPLOY_ID 必須一致
   WEB_APP_URL:    'https://script.google.com/macros/s/AKfycbyXt1vNUGZVOiZrs88Z9Bp8XWun4WzV_YnZRFWGe3j7NENiKL9m02hJyfH_KJ_sB8P8/exec',
   // 幹部職稱列表
   CADRE_TITLES: ['班長','副班長','學藝股長','風紀股長','衛生股長','體育股長','資訊股長','總務股長','環保股長'],
   // 小老師科目列表
   TEACHER_SUBJECTS: ['班級公告','國文','英文','數學','物理','化學','生物','地科','歷史','地理','公民與社會','體育','音樂','美術','自主學習','探究','本土語文']
 };
+
+/**
+ * 呼叫後端 API：先 POST，失敗（非 JSON / 網路）時改走 GET ?action=api&payload=
+ * 解決部分環境 POST 被擋導致幹部「發布失敗」
+ */
+async function apiCall(body) {
+  // 1) POST
+  try {
+    const response = await fetch(CONFIG.WEB_APP_URL, {
+      method: 'POST',
+      mode: 'cors',
+      redirect: 'follow',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(body)
+    });
+    const text = await response.text();
+    try {
+      const json = JSON.parse(text);
+      return json;
+    } catch (parseErr) {
+      console.warn('POST 回傳非 JSON，改試 GET 備援', text.slice(0, 120));
+    }
+  } catch (e) {
+    console.warn('POST 失敗，改試 GET 備援', e);
+  }
+
+  // 2) GET 備援
+  const payload = encodeURIComponent(JSON.stringify(body));
+  // URL 過長時無法 GET（約 > 1800），回傳明確錯誤
+  const url = `${CONFIG.WEB_APP_URL}?action=api&payload=${payload}`;
+  if (url.length > 1800) {
+    return {
+      success: false,
+      error: 'REQUEST_TOO_LONG',
+      detail: '內容過長且 POST 通道不可用，請縮短公告或聯繫導師檢查 Web App 部署'
+    };
+  }
+  const res2 = await fetch(url, { method: 'GET', mode: 'cors', cache: 'no-store', redirect: 'follow' });
+  const text2 = await res2.text();
+  try {
+    return JSON.parse(text2);
+  } catch (e2) {
+    console.error('GET 備援也非 JSON', text2.slice(0, 200));
+    return {
+      success: false,
+      error: 'NETWORK_OR_DEPLOY',
+      detail: '無法連線後端 Web App（請導師重新「管理部署」並設為任何人可存取）'
+    };
+  }
+}
 
 // ═══════════════════════════════════════════════════════
 //  App 狀態
@@ -1413,24 +1464,12 @@ function normalizeCategoryClient(cat) {
 async function verifyAdminSecret(secret) {
   if (!secret) return false;
   try {
-    const response = await fetch(CONFIG.WEB_APP_URL, {
-      method: 'POST',
-      mode: 'cors',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: 'verifyAdmin', adminSecret: secret })
-    });
-    const result = await response.json();
+    const result = await apiCall({ action: 'verifyAdmin', adminSecret: secret });
     if (result && result.success) return true;
 
-    // 後端尚未部署新 action 時：用既有 getPin 探測密鑰（相容舊 Web App 版本）
-    if (result && (result.error === 'UNKNOWN_ACTION' || result.error === 'PARSE_ERROR')) {
-      const r2 = await fetch(CONFIG.WEB_APP_URL, {
-        method: 'POST',
-        mode: 'cors',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: 'getPin', adminSecret: secret })
-      });
-      const j2 = await r2.json();
+    // 後端尚未部署新 action 時：用既有 getPin 探測密鑰
+    if (result && (result.error === 'UNKNOWN_ACTION' || result.error === 'PARSE_ERROR' || result.error === 'NETWORK_OR_DEPLOY')) {
+      const j2 = await apiCall({ action: 'getPin', adminSecret: secret });
       return !!(j2 && j2.success);
     }
     return false;
@@ -1807,26 +1846,15 @@ async function verifyRolePin() {
   document.getElementById('pin-error').textContent = '';
 
   try {
-    // 改為向後端發送請求進行安全驗證，防止授權碼洩漏在前端
-    const payload = {
-      action: 'verifyPin',
-      pin: pin
-    };
-
-    const response = await fetch(CONFIG.WEB_APP_URL, {
-      method: 'POST',
-      mode: 'cors',
-      headers: {
-        'Content-Type': 'text/plain;charset=utf-8'
-      },
-      body: JSON.stringify(payload)
-    });
-
-    const result = await response.json();
-    if (result.success) {
+    const result = await apiCall({ action: 'verifyPin', pin: pin });
+    if (result && result.success) {
       APP.verifiedPin = true;
       APP.verifiedPinVal = pin; // 暫存驗證過的 PIN 碼
+      saveRole();
       proceedFromRole();
+    } else if (result && (result.error === 'NETWORK_OR_DEPLOY' || result.error === 'REQUEST_TOO_LONG')) {
+      document.getElementById('pin-error').textContent =
+        '無法連線後端（' + (result.detail || result.error) + '）。請導師重新部署 Web App。';
     } else {
       document.getElementById('pin-error').textContent = '授權碼錯誤，請再試一次';
       document.getElementById('role-pin').value = '';
@@ -2271,30 +2299,21 @@ async function deleteAnnouncement(timestamp, event, rowId) {
   try {
     const payload = {
       action: 'updateStatus',
-      adminSecret: APP.adminSecret,
-      pin: APP.verifiedPinVal,
+      adminSecret: APP.adminSecret || undefined,
+      pin: APP.verifiedPinVal || undefined,
       posterName: APP.posterLabel,
       timestamp: timestamp,
       rowId: rowId || '',
       status: 'hidden'
     };
 
-    const response = await fetch(CONFIG.WEB_APP_URL, {
-      method: 'POST',
-      mode: 'cors',
-      headers: {
-        'Content-Type': 'text/plain;charset=utf-8'
-      },
-      body: JSON.stringify(payload)
-    });
-
-    const result = await response.json();
-    if (result.success) {
+    const result = await apiCall(payload);
+    if (result && result.success) {
       showToast('公告已成功隱藏', 'success');
       BULLETINS_CACHE = null;
       loadBoard(true);
     } else {
-      showToast('操作失敗：' + (result.error || '未知錯誤'), 'error');
+      showToast('操作失敗：' + ((result && result.error) || '未知錯誤'), 'error');
     }
   } catch (e) {
     showToast('網路連線失敗或權限不足', 'error');
@@ -2309,28 +2328,19 @@ async function toggleMarquee(timestamp, nextStatus, event, rowId) {
   try {
     const payload = {
       action: 'updateMarquee',
-      adminSecret: APP.adminSecret,
+      adminSecret: APP.adminSecret || undefined,
       timestamp: timestamp,
       rowId: rowId || '',
       marqueeStatus: nextStatus
     };
 
-    const response = await fetch(CONFIG.WEB_APP_URL, {
-      method: 'POST',
-      mode: 'cors',
-      headers: {
-        'Content-Type': 'text/plain;charset=utf-8'
-      },
-      body: JSON.stringify(payload)
-    });
-
-    const result = await response.json();
-    if (result.success) {
+    const result = await apiCall(payload);
+    if (result && result.success) {
       showToast('已更新跑馬燈設定', 'success');
       BULLETINS_CACHE = null;
       loadBoard(true);
     } else {
-      showToast('設定失敗：' + (result.error || '未知錯誤'), 'error');
+      showToast('設定失敗：' + ((result && result.error) || '未知錯誤'), 'error');
     }
   } catch (e) {
     showToast('網路連線失敗或權限不足', 'error');
@@ -2349,6 +2359,24 @@ function showAdminEdit() {
 // ═══════════════════════════════════════════════════════
 //  發布公告（打後端 API + 驗證 PIN 碼）
 // ═══════════════════════════════════════════════════════
+async function ensureEditorAuth() {
+  // 導師用 adminSecret；幹部／小老師必須有 PIN
+  if (APP.adminSecret) return true;
+  if (APP.verifiedPinVal) return true;
+
+  const pin = window.prompt('授權階段已失效，請重新輸入授權碼（PIN）才能發布：');
+  if (!pin) return false;
+  const result = await apiCall({ action: 'verifyPin', pin: pin.trim() });
+  if (result && result.success) {
+    APP.verifiedPin = true;
+    APP.verifiedPinVal = pin.trim();
+    saveRole();
+    return true;
+  }
+  showToast('授權碼錯誤，無法發布', 'error');
+  return false;
+}
+
 async function submitBulletin() {
   if (APP.isSubmitting) return;
   const category = document.getElementById('ed-category').value;
@@ -2372,10 +2400,16 @@ async function submitBulletin() {
   btn.disabled = true; btn.textContent = '發布中…';
 
   try {
+    const okAuth = await ensureEditorAuth();
+    if (!okAuth) {
+      showStatusMsg('請先通過授權碼驗證再發布', 'error');
+      return;
+    }
+
     const payload = {
       action: 'publishAnnouncement',
-      adminSecret: APP.adminSecret,
-      pin: APP.verifiedPinVal,
+      adminSecret: APP.adminSecret || undefined,
+      pin: APP.verifiedPinVal || undefined,
       category: normalizeCategoryClient(category),
       subject: subject,
       dueDate: dueDate,
@@ -2384,34 +2418,30 @@ async function submitBulletin() {
       posterType: APP.posterType
     };
 
-    const response = await fetch(CONFIG.WEB_APP_URL, {
-      method: 'POST',
-      mode: 'cors',
-      headers: {
-        'Content-Type': 'text/plain;charset=utf-8'
-      },
-      body: JSON.stringify(payload)
-    });
-
-    const result = await response.json();
-    if (result.success) {
+    const result = await apiCall(payload);
+    if (result && result.success) {
       showToast('公告發布成功', 'success');
-      showStatusMsg('公告已成功發布！請重新整理公告欄查看。', 'success');
+      showStatusMsg('公告已成功發布！請到公告欄按「重新整理」查看。', 'success');
       
-      // 清除草稿暫存與公告快取
       clearAutosaveDraft();
       resetEditorForm();
       BULLETINS_CACHE = null;
-      
-      // 重新整理發布歷史紀錄
       initEditorPanel();
     } else {
-      if (result.error === 'UNAUTHORIZED') {
-        showToast('驗證失敗：PIN 碼或管理密碼錯誤，請重新登入', 'error');
-        showStatusMsg('驗證失敗：PIN 碼或管理密碼錯誤，請重新登入', 'error');
+      const err = (result && result.error) || '未知錯誤';
+      const detail = (result && result.detail) ? `（${result.detail}）` : '';
+      if (err === 'UNAUTHORIZED') {
+        APP.verifiedPin = false;
+        APP.verifiedPinVal = null;
+        saveRole();
+        showToast('驗證失敗：請重新輸入授權碼', 'error');
+        showStatusMsg('驗證失敗：PIN 錯誤或已失效，請回身份頁重新驗證', 'error');
+      } else if (err === 'NETWORK_OR_DEPLOY' || err === 'REQUEST_TOO_LONG') {
+        showToast('發布失敗：後端連線異常', 'error');
+        showStatusMsg('發布失敗：' + err + detail + '。請導師在 script.google.com 重新部署 Web App（任何人可存取）。', 'error');
       } else {
-        showToast('發布失敗：' + (result.error || '未知錯誤'), 'error');
-        showStatusMsg('發布失敗：' + (result.error || '未知錯誤'), 'error');
+        showToast('發布失敗：' + err, 'error');
+        showStatusMsg('發布失敗：' + err + detail, 'error');
       }
     }
   } catch (e) {
@@ -2421,7 +2451,7 @@ async function submitBulletin() {
   } finally {
     APP.isSubmitting = false;
     btn.disabled = false;
-    btn.textContent = '發布公告';
+    btn.textContent = APP.isEditing ? '儲存修改' : '發布公告';
   }
 }
 
@@ -2795,10 +2825,16 @@ async function submitEditedBulletin(category, subject, dueDate, content) {
   btn.disabled = true; btn.textContent = '更新中…';
 
   try {
+    const okAuth = await ensureEditorAuth();
+    if (!okAuth) {
+      showStatusMsg('請先通過授權碼驗證', 'error');
+      return;
+    }
+
     const payload = {
       action: 'editAnnouncement',
-      adminSecret: APP.adminSecret,
-      pin: APP.verifiedPinVal,
+      adminSecret: APP.adminSecret || undefined,
+      pin: APP.verifiedPinVal || undefined,
       timestamp: APP.editingTimestamp,
       rowId: APP.editingRowId || '',
       category: normalizeCategoryClient(category),
@@ -2808,17 +2844,8 @@ async function submitEditedBulletin(category, subject, dueDate, content) {
       posterName: APP.posterLabel
     };
 
-    const response = await fetch(CONFIG.WEB_APP_URL, {
-      method: 'POST',
-      mode: 'cors',
-      headers: {
-        'Content-Type': 'text/plain;charset=utf-8'
-      },
-      body: JSON.stringify(payload)
-    });
-
-    const result = await response.json();
-    if (result.success) {
+    const result = await apiCall(payload);
+    if (result && result.success) {
       showToast('公告更新成功', 'success');
       showStatusMsg('公告已成功更新！', 'success');
       
