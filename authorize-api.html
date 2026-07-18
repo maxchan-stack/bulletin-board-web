@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>佈告欄 API 授權（導師一次即可）</title>
+  <style>
+    body { font-family: "Noto Sans TC", sans-serif; max-width: 640px; margin: 40px auto; padding: 0 16px; line-height: 1.6; }
+    .box { border: 1px solid #ddd; border-radius: 12px; padding: 20px; background: #fafafa; }
+    a.btn, button { display: inline-block; margin: 8px 8px 8px 0; padding: 12px 18px; background: #1a5d57; color: #fff; border-radius: 8px; text-decoration: none; border: 0; cursor: pointer; font-size: 1rem; }
+    a.btn.secondary { background: #4C729F; }
+    pre { background: #111; color: #9f9; padding: 12px; border-radius: 8px; overflow: auto; white-space: pre-wrap; }
+    .ok { color: #0a7; font-weight: 700; }
+    .bad { color: #c33; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <h1>修復「UNKNOWN_ACTION / 幹部發布失敗」</h1>
+  <div class="box">
+    <p>原因：舊 Web App 部署沒有「發布公告」動作。已改接新 API，但需<strong>導師用學校帳號授權一次</strong>。</p>
+    <ol>
+      <li>用 <strong>maxchan@webmail.ccsh.tp.edu.tw</strong>（或有試算表權限的學校帳號）登入 Google</li>
+      <li>點下方「① 開啟 API 授權頁」→ 若跳出權限請求按<strong>允許</strong></li>
+      <li>再點「② 測試 API」→ 應顯示 <code class="ok">success: true</code></li>
+      <li>回到佈告欄無痕視窗，用幹部 PIN 再發一次公告</li>
+    </ol>
+    <a class="btn" id="authLink" target="_blank" rel="noopener">① 開啟 API 授權頁</a>
+    <button type="button" class="btn secondary" id="testBtn">② 測試 API</button>
+    <a class="btn secondary" href="./bulletin.html" target="_blank">③ 開啟佈告欄</a>
+    <pre id="out">等待測試…</pre>
+  </div>
+  <script>
+    const API = 'https://script.google.com/macros/s/AKfycbyQr4WjfdF_sNs7z1VyngP0rPxYJJEpGsp1i7dO_MHR5w5egCvJIjVMFavea_CnHHgPeA/exec';
+    document.getElementById('authLink').href = API + '?page=auth';
+    document.getElementById('testBtn').onclick = async () => {
+      const out = document.getElementById('out');
+      out.textContent = '測試中…';
+      try {
+        const r = await fetch(API + '?action=listSheets&_=' + Date.now(), { cache: 'no-store' });
+        const t = await r.text();
+        try {
+          const j = JSON.parse(t);
+          out.textContent = JSON.stringify(j, null, 2);
+          if (j.success) {
+            out.insertAdjacentHTML('beforebegin', '<p class="ok">✅ API 已可用，請回佈告欄用幹部身分發布</p>');
+          }
+        } catch {
+          out.textContent = '尚未授權成功（仍回傳網頁而非 JSON）。請確認：\n1) 已用學校帳號登入\n2) 已在授權頁按「允許」\n3) 試算表有分享給你的帳號\n\n原始回應前 300 字：\n' + t.slice(0, 300);
+        }
+      } catch (e) {
+        out.textContent = String(e);
+      }
+    };
+  </script>
+</body>
+</html>
