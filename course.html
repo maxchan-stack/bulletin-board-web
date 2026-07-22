@@ -6,6 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>教學進度 V10 Ultra (無印極簡版)</title>
 
+    <!-- PWA Configuration -->
+    <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#1a5d57">
@@ -51,7 +53,7 @@
         }
     </script>
 
-    <!-- React 18 & Babel Standalone & Lucide Icons (Cloudflare cdnjs / jsDelivr 極速 CDN) -->
+    <!-- React 18 & Babel Standalone & Lucide Icons -->
     <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
@@ -262,32 +264,30 @@
             const getDayBefore = (s) => { if (!s) return null; const d = new Date(s); d.setDate(d.getDate() - 1); return formatDate(d); };
             const weekDays = ['一', '二', '三', '四', '五', '六', '日'];
 
-            // ── 同步讀寫 localStorage 工具 ──
-            const lsGet = (key, def) => {
-                try { const v = localStorage.getItem(key); return v !== null ? JSON.parse(v) : def; } catch { return def; }
-            };
-            const lsSave = (key, val) => {
-                try { localStorage.setItem(key, JSON.stringify(val)); } catch(e) {}
-            };
-
-            // --- State Declarations (Lazy Initializer: 首次渲染前同步從 localStorage 讀取) ---
-            const [academicYears, setAcademicYears] = useState(() => lsGet('v10_years', DEFAULT_YEARS));
-            const [currentYear, setCurrentYear] = useState(() => lsGet('v10_current_year', DEFAULT_CURRENT_YEAR));
-            const [records, setRecords] = useState(() => lsGet('v10_records', []));
-            const [classes, setClasses] = useState(() => lsGet('v10_classes', []));
-            const [exams, setExams] = useState(() => lsGet('v10_exams', {}));
-            const [holidays, setHolidays] = useState(() => lsGet('v10_holidays', INITIAL_HOLIDAYS));
-            const [customHolidays, setCustomHolidays] = useState(() => lsGet('v10_custom_holidays', []));
-            const [makeupDays, setMakeupDays] = useState(() => lsGet('v10_makeup_days', {}));
-            const [tags, setTags] = useState(() => lsGet('v10_tags', ['複習', '實驗', '影片', '學習單', '分組', '口試']));
+            // --- State Declarations ---
+            const [academicYears, setAcademicYears] = useState(DEFAULT_YEARS);
+            const [currentYear, setCurrentYear] = useState(DEFAULT_CURRENT_YEAR);
+            const [records, setRecords] = useState([]);
+            const [classes, setClasses] = useState([]);
+            const [exams, setExams] = useState({});
+            const [holidays, setHolidays] = useState(INITIAL_HOLIDAYS);
+            const [customHolidays, setCustomHolidays] = useState([]);
+            const [makeupDays, setMakeupDays] = useState({});
 
             const [viewMode, setViewMode] = useState('list');
+            
             const [showSettings, setShowSettings] = useState(false);
             const [settingTab, setSettingTab] = useState('class');
             const [filter, setFilter] = useState('');
+
             const [form, setForm] = useState({ className: '', subject: '', date: formatDate(new Date()), progress: '', homework: '', quiz: false, tags: [], note: '' });
+            const [tags, setTags] = useState(['複習', '實驗', '影片', '學習單', '分組', '口試']);
             const [expandedClasses, setExpandedClasses] = useState({});
             const [calendarDate, setCalendarDate] = useState(new Date());
+
+            // Cloud Offline Sync Queue
+            const [cloudSettings, setCloudSettings] = useState({ gasUrl: '' });
+            const [offlineQueue, setOfflineQueue] = useState([]);
             const [isOnline, setIsOnline] = useState(navigator.onLine);
 
             // Undo Delete & Edit
@@ -303,17 +303,6 @@
             const dragItem = useRef(null);
             const dragOverItem = useRef(null);
 
-            // --- 自動儲存：任何資料變動時直接同步寫入 localStorage ---
-            useEffect(() => { lsSave('v10_records', records); }, [records]);
-            useEffect(() => { lsSave('v10_classes', classes); }, [classes]);
-            useEffect(() => { lsSave('v10_years', academicYears); }, [academicYears]);
-            useEffect(() => { lsSave('v10_current_year', currentYear); }, [currentYear]);
-            useEffect(() => { lsSave('v10_exams', exams); }, [exams]);
-            useEffect(() => { lsSave('v10_holidays', holidays); }, [holidays]);
-            useEffect(() => { lsSave('v10_custom_holidays', customHolidays); }, [customHolidays]);
-            useEffect(() => { lsSave('v10_makeup_days', makeupDays); }, [makeupDays]);
-            useEffect(() => { lsSave('v10_tags', tags); }, [tags]);
-
             // --- Custom Modal Helper Functions ---
             const showAlert = (title, message) => {
                 setModalConfig({ type: 'alert', title, message });
@@ -327,25 +316,175 @@
                 setModalConfig({ type: 'prompt', title, placeholder, value: '', onPromptSubmit: onSubmit });
             };
 
-            // --- Initialization ---
+            // --- Initialization & PWA Service Worker ---
             useEffect(() => {
+                if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW registration skipped', err));
+                }
+
                 const handleOnline = () => setIsOnline(true);
                 const handleOffline = () => setIsOnline(false);
                 window.addEventListener('online', handleOnline);
                 window.addEventListener('offline', handleOffline);
 
+                const loadData = async () => {
+                    const load = (k, def) => { try { return JSON.parse(localStorage.getItem(k)) || def; } catch { return def; } };
+                    
+                    let idbRecords = await loadFromIDB('records');
+                    setRecords(idbRecords || load('v10_records', []));
+
+                    let idbClasses = await loadFromIDB('classes');
+                    setClasses(idbClasses || load('v10_classes', []));
+
+                    setAcademicYears(load('v10_years', DEFAULT_YEARS));
+                    setCurrentYear(localStorage.getItem('v10_current_year') || DEFAULT_CURRENT_YEAR);
+                    setExams(load('v10_exams', {}));
+                    setHolidays(load('v10_holidays', INITIAL_HOLIDAYS));
+                    setCustomHolidays(load('v10_custom_holidays', []));
+                    setMakeupDays(load('v10_makeup_days', {}));
+                    setTags(load('v10_tags', ['複習', '實驗', '影片', '學習單', '分組', '口試']));
+                    setCloudSettings(load('v10_cloud_settings', { gasUrl: '' }));
+                    setOfflineQueue(load('v10_offline_queue', []));
+                };
+
+                loadData();
+
+                // ══════════════════════════════════════════════════════════════════
+                // 5. Firebase Realtime Database 免費即時推播與同步模組 (方案 B)
+                // ══════════════════════════════════════════════════════════════════
+                const defaultDbUrl = 'https://classtracker-v10-default-rtdb.firebaseio.com';
+                const firebaseConfig = JSON.parse(localStorage.getItem('v10_firebase_settings') || `{"dbUrl":"${defaultDbUrl}"}`);
+                const currentDbUrl = (firebaseConfig.dbUrl || defaultDbUrl).replace(/\/+$/, '');
+
+                let eventSource = null;
+
+                // 開頁與背景即時監聽 (EventSource Server-Sent Events)
+                const startFirebaseListener = () => {
+                    if (!currentDbUrl || !window.EventSource) return;
+                    try {
+                        // 關閉舊連線
+                        if (eventSource) eventSource.close();
+
+                        // 建立即時推播監聽
+                        eventSource = new EventSource(`${currentDbUrl}/classtracker.json`);
+                        
+                        eventSource.onmessage = (e) => {
+                            try {
+                                const payload = JSON.parse(e.data);
+                                if (!payload || !payload.data) return;
+                                const data = payload.data;
+                                
+                                if (data.records) {
+                                    const recordList = Array.isArray(data.records) 
+                                        ? data.records.filter(Boolean) 
+                                        : Object.values(data.records);
+                                    
+                                    setRecords(prev => {
+                                        const localMap = new Map(prev.map(r => [r.id, r]));
+                                        let updated = false;
+                                        recordList.forEach(r => {
+                                            if (r && r.id && (!localMap.has(r.id) || JSON.stringify(localMap.get(r.id)) !== JSON.stringify(r))) {
+                                                localMap.set(r.id, r);
+                                                updated = true;
+                                            }
+                                        });
+                                        return updated 
+                                            ? Array.from(localMap.values()).sort((a, b) => new Date(b.date || b.timestamp) - new Date(a.date || a.timestamp))
+                                            : prev;
+                                    });
+                                }
+
+                                if (data.classes) {
+                                    const classList = Array.isArray(data.classes)
+                                        ? data.classes.filter(Boolean)
+                                        : Object.values(data.classes);
+
+                                    setClasses(prev => {
+                                        const localKeys = new Set(prev.map(c => c.name + '_' + c.year));
+                                        const newClasses = classList.filter(c => c && !localKeys.has(c.name + '_' + c.year));
+                                        return newClasses.length > 0 ? [...prev, ...newClasses] : prev;
+                                    });
+                                }
+                            } catch (err) { console.warn('Firebase SSE parse error', err); }
+                        };
+
+                        eventSource.onerror = () => {
+                            // 若連線中斷則手動回退至 REST 抓取
+                            fetchFirebaseRest();
+                        };
+                    } catch (err) {
+                        fetchFirebaseRest();
+                    }
+                };
+
+                // REST 備用抓取
+                const fetchFirebaseRest = async () => {
+                    if (!currentDbUrl) return;
+                    try {
+                        const res = await fetch(`${currentDbUrl}/classtracker.json`);
+                        if (!res.ok) return;
+                        const data = await res.json();
+                        if (data) {
+                            if (data.records) {
+                                const list = Array.isArray(data.records) ? data.records.filter(Boolean) : Object.values(data.records);
+                                setRecords(prev => {
+                                    const map = new Map(prev.map(r => [r.id, r]));
+                                    list.forEach(r => { if (r && r.id) map.set(r.id, r); });
+                                    return Array.from(map.values()).sort((a, b) => new Date(b.date || b.timestamp) - new Date(a.date || a.timestamp));
+                                });
+                            }
+                            if (data.classes) {
+                                const list = Array.isArray(data.classes) ? data.classes.filter(Boolean) : Object.values(data.classes);
+                                setClasses(prev => {
+                                    const keys = new Set(prev.map(c => c.name + '_' + c.year));
+                                    const added = list.filter(c => c && !keys.has(c.name + '_' + c.year));
+                                    return added.length > 0 ? [...prev, ...added] : prev;
+                                });
+                            }
+                        }
+                    } catch (e) { console.warn('Firebase REST fetch skipped', e); }
+                };
+
+                // 新增紀錄即時寫入 Firebase
+                window.syncRecordToFirebase = async (record) => {
+                    if (!currentDbUrl) return;
+                    try {
+                        await fetch(`${currentDbUrl}/classtracker/records/${record.id}.json`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(record)
+                        });
+                    } catch (e) { console.warn('Firebase write skipped', e); }
+                };
+
+                window.syncClassesToFirebase = async (classesList) => {
+                    if (!currentDbUrl) return;
+                    try {
+                        await fetch(`${currentDbUrl}/classtracker/classes.json`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(classesList)
+                        });
+                    } catch (e) { console.warn('Firebase class write skipped', e); }
+                };
+
+                startFirebaseListener();
+
                 // 自動聯網查詢並更新行政院國定放假日期 (TaiwanCalendar API)
                 const autoFetchHolidays = async () => {
                     const y = new Date().getFullYear();
+                    const yearsToFetch = [y - 1, y, y + 1];
                     try {
-                        const results = await Promise.all([y-1, y, y+1].map(async (year) => {
-                            try {
-                                const res = await fetch(`https://cdn.jsdelivr.net/gh/ruyut/TaiwanCalendar/data/${year}.json`);
-                                if (!res.ok) return [];
-                                const data = await res.json();
-                                return data.filter(x => x.isHoliday).map(x => x.date.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'));
-                            } catch { return []; }
-                        }));
+                        const results = await Promise.all(
+                            yearsToFetch.map(async (year) => {
+                                try {
+                                    const res = await fetch(`https://cdn.jsdelivr.net/gh/ruyut/TaiwanCalendar/data/${year}.json`);
+                                    if (!res.ok) return [];
+                                    const data = await res.json();
+                                    return data.filter(x => x.isHoliday).map(x => x.date.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'));
+                                } catch { return []; }
+                            })
+                        );
                         const fetched = results.flat();
                         if (fetched.length > 0) {
                             setHolidays(prev => [...new Set([...prev, ...fetched])].sort());
@@ -355,18 +494,82 @@
                 autoFetchHolidays();
 
                 return () => {
+                    if (pollingTimer) clearInterval(pollingTimer);
                     window.removeEventListener('online', handleOnline);
                     window.removeEventListener('offline', handleOffline);
                 };
             }, []);
+
+            // Consolidated LocalStorage & IndexedDB Data Persistence
+            const persistentData = useMemo(() => ({
+                records, classes, exams, holidays, customHolidays, makeupDays,
+                years: academicYears, tags, currentYear, cloudSettings, offlineQueue
+            }), [records, classes, exams, holidays, customHolidays, makeupDays, academicYears, tags, currentYear, cloudSettings, offlineQueue]);
+
+            useEffect(() => {
+                Object.entries(persistentData).forEach(([key, value]) => {
+                    const storageKey = key === 'years' ? 'v10_years' :
+                        key === 'currentYear' ? 'v10_current_year' :
+                        key === 'cloudSettings' ? 'v10_cloud_settings' :
+                        key === 'offlineQueue' ? 'v10_offline_queue' : `v10_${key}`;
+                    
+                    localStorage.setItem(storageKey, typeof value === 'string' ? value : JSON.stringify(value));
+                });
+
+                saveToIDB('records', records);
+                saveToIDB('classes', classes);
+            }, [persistentData]);
+
+            
+
+            // --- Offline Cloud Queue Processing ---
+            useEffect(() => {
+                if (isOnline && offlineQueue.length > 0 && cloudSettings.gasUrl) {
+                    const processQueue = async () => {
+                        const queueToProcess = [...offlineQueue];
+                        setOfflineQueue([]);
+                        for (const item of queueToProcess) {
+                            try {
+                                await fetch(cloudSettings.gasUrl, {
+                                    method: 'POST',
+                                    mode: 'no-cors',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ action: 'add_record', record: item })
+                                });
+                            } catch (e) {
+                                console.warn('Cloud sync queue retry failed', e);
+                            }
+                        }
+                    };
+                    processQueue();
+                }
+            }, [isOnline, offlineQueue, cloudSettings]);
+
+            const uploadRecordToCloud = async (record) => {
+                if (!cloudSettings.gasUrl) return;
+                if (!navigator.onLine) {
+                    setOfflineQueue(prev => [...prev, record]);
+                    return;
+                }
+                try {
+                    await fetch(cloudSettings.gasUrl, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'add_record', record })
+                    });
+                } catch (e) {
+                    setOfflineQueue(prev => [...prev, record]);
+                }
+            };
 
             const currentExams = useMemo(() => exams[currentYear] || {
                 semesterStart: '', semesterEnd: '',
                 exam1: { start: '', end: '' }, exam2: { start: '', end: '' }, exam3: { start: '', end: '' }
             }, [exams, currentYear]);
 
-            const currentYearClasses = useMemo(() => classes.filter(c => !c.year || c.year === currentYear), [classes, currentYear]);
-            const currentYearRecords = useMemo(() => records.filter(r => !r.year || r.year === currentYear), [records, currentYear]);
+            const currentYearClasses = useMemo(() => classes.filter(c => c.year === currentYear), [classes, currentYear]);
+            const currentYearRecords = useMemo(() => records.filter(r => r.year === currentYear), [records, currentYear]);
 
             const isClassDoneToday = (className) => {
                 const today = formatDate(new Date());
