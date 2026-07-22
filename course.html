@@ -303,6 +303,8 @@
             const dragItem = useRef(null);
             const dragOverItem = useRef(null);
 
+            const [isInitialized, setIsInitialized] = useState(false);
+
             // --- Custom Modal Helper Functions ---
             const showAlert = (title, message) => {
                 setModalConfig({ type: 'alert', title, message });
@@ -331,10 +333,10 @@
                     const load = (k, def) => { try { return JSON.parse(localStorage.getItem(k)) || def; } catch { return def; } };
                     
                     let idbRecords = await loadFromIDB('records');
-                    setRecords(idbRecords || load('v10_records', []));
+                    setRecords((idbRecords && idbRecords.length > 0) ? idbRecords : load('v10_records', []));
 
                     let idbClasses = await loadFromIDB('classes');
-                    setClasses(idbClasses || load('v10_classes', []));
+                    setClasses((idbClasses && idbClasses.length > 0) ? idbClasses : load('v10_classes', INITIAL_CLASSES));
 
                     setAcademicYears(load('v10_years', DEFAULT_YEARS));
                     setCurrentYear(localStorage.getItem('v10_current_year') || DEFAULT_CURRENT_YEAR);
@@ -345,6 +347,8 @@
                     setTags(load('v10_tags', ['複習', '實驗', '影片', '學習單', '分組', '口試']));
                     setCloudSettings(load('v10_cloud_settings', { gasUrl: '' }));
                     setOfflineQueue(load('v10_offline_queue', []));
+
+                    setIsInitialized(true);
                 };
 
                 loadData();
@@ -507,6 +511,8 @@
             }), [records, classes, exams, holidays, customHolidays, makeupDays, academicYears, tags, currentYear, cloudSettings, offlineQueue]);
 
             useEffect(() => {
+                if (!isInitialized) return;
+
                 Object.entries(persistentData).forEach(([key, value]) => {
                     const storageKey = key === 'years' ? 'v10_years' :
                         key === 'currentYear' ? 'v10_current_year' :
@@ -518,7 +524,7 @@
 
                 saveToIDB('records', records);
                 saveToIDB('classes', classes);
-            }, [persistentData]);
+            }, [persistentData, isInitialized]);
 
             
 
