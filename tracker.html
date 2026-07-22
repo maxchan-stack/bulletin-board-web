@@ -843,10 +843,26 @@
                                 </div>
                             </div>
                             <div className="flex items-center gap-2">
-                                <div className="hidden md:flex items-center bg-black/15 rounded-lg px-3 py-1.5">
+                                <div className="hidden md:flex items-center bg-black/15 rounded-full px-3 py-1.5 gap-1">
                                     <select value={currentYear} onChange={e => setCurrentYear(e.target.value)} className="bg-transparent text-white font-medium text-sm outline-none cursor-pointer [&>option]:text-black">
                                         {academicYears.map(y => <option key={y} value={y}>{y} 學年</option>)}
                                     </select>
+                                    <button
+                                        onClick={() => {
+                                            showPrompt('新增學年/學期', '輸入學年名稱 (例: 115-1)', (val) => {
+                                                if (val && !academicYears.includes(val)) {
+                                                    const updated = [...academicYears, val].sort();
+                                                    setAcademicYears(updated);
+                                                    setCurrentYear(val);
+                                                    showAlert('新增成功', `已成功建立並切換至「${val}」學年！`);
+                                                }
+                                            });
+                                        }}
+                                        className="text-white/80 hover:text-white hover:bg-white/20 p-1 rounded-full text-xs font-bold transition-all"
+                                        title="新增學年"
+                                    >
+                                        <LucideIcon name="Plus" size={14} />
+                                    </button>
                                 </div>
                                 
                                 <div className="hidden md:block w-px h-6 bg-white/20"></div>
@@ -1216,12 +1232,52 @@
                                     <button onClick={() => setShowSettings(false)} className="text-gray-400 hover:text-gray-600"><LucideIcon name="X" /></button>
                                 </div>
                                 <div className="flex bg-gray-100 p-1 rounded-xl">
-                                    {['class', 'exam', 'holiday', 'system'].map(t => (
-                                        <button key={t} onClick={() => setSettingTab(t)} className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all ${settingTab === t ? 'bg-white text-[#1a5d57] shadow-sm' : 'text-gray-400'}`}>
-                                            {t === 'class' ? '排課' : t === 'exam' ? '段考' : t === 'holiday' ? '假期/補課' : '系統'}
+                                    {['year', 'class', 'exam', 'holiday', 'system'].map(t => (
+                                        <button key={t} onClick={() => setSettingTab(t)} className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all ${settingTab === t ? 'bg-white text-[#1a5d57] shadow-sm font-bold' : 'text-gray-400'}`}>
+                                            {t === 'year' ? '學年' : t === 'class' ? '排課' : t === 'exam' ? '段考' : t === 'holiday' ? '假期/補課' : '系統'}
                                         </button>
                                     ))}
                                 </div>
+
+                                {settingTab === 'year' && (
+                                    <div className="space-y-4">
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-gray-400 uppercase">新增學年與學期</label>
+                                            <div className="flex gap-2">
+                                                <input id="newYearInput" placeholder="輸入學年名稱 (例: 115-1 或 115-2)" className="flex-1 bg-[#f4f6f7] p-2.5 rounded-xl border border-[#dde4e3] text-xs font-medium outline-none" />
+                                                <MujiButton onClick={() => {
+                                                    const val = document.getElementById('newYearInput').value.trim();
+                                                    if (val && !academicYears.includes(val)) {
+                                                        const updatedYears = [...academicYears, val].sort();
+                                                        setAcademicYears(updatedYears);
+                                                        setCurrentYear(val);
+                                                        document.getElementById('newYearInput').value = '';
+                                                        showAlert('新增成功', `已成功建立並切換至「${val}」學年！`);
+                                                    } else {
+                                                        showAlert('警告', '學年名稱無效或已存在');
+                                                    }
+                                                }} iconName="Plus" label="新增" size="sm" />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2 pt-2 border-t">
+                                            <label className="text-xs font-bold text-gray-400 uppercase block mb-1">現有學年清單 (點擊可快速切換)</label>
+                                            {academicYears.map(y => (
+                                                <div key={y} className={`flex justify-between p-3 rounded-xl items-center text-xs transition-all ${currentYear === y ? 'bg-[#1a5d57] text-white font-bold' : 'bg-[#f4f6f7] text-[#243231]'}`}>
+                                                    <span className="cursor-pointer" onClick={() => setCurrentYear(y)}>{y} 學年 {currentYear === y ? '(目前選取)' : ''}</span>
+                                                    {academicYears.length > 1 && (
+                                                        <button onClick={() => {
+                                                            showConfirm('刪除學年確認', `確定要刪除「${y}」學年嗎？`, () => {
+                                                                const updated = academicYears.filter(x => x !== y);
+                                                                setAcademicYears(updated);
+                                                                if (currentYear === y) setCurrentYear(updated[0]);
+                                                            });
+                                                        }} className={`${currentYear === y ? 'text-white/80 hover:text-white' : 'text-gray-400 hover:text-red-600'}`}><LucideIcon name="Trash2" size={16} /></button>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
 
                                 {settingTab === 'class' && (
                                     <div className="space-y-4">
