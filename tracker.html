@@ -265,29 +265,35 @@
             const weekDays = ['一', '二', '三', '四', '五', '六', '日'];
 
             // --- State Declarations ---
-            const [academicYears, setAcademicYears] = useState(DEFAULT_YEARS);
-            const [currentYear, setCurrentYear] = useState(DEFAULT_CURRENT_YEAR);
-            const [records, setRecords] = useState([]);
-            const [classes, setClasses] = useState([]);
-            const [exams, setExams] = useState({});
-            const [holidays, setHolidays] = useState(INITIAL_HOLIDAYS);
-            const [customHolidays, setCustomHolidays] = useState([]);
-            const [makeupDays, setMakeupDays] = useState({});
+            // ── 一次性強制重置清空 (確保瀏覽器舊測試資料 100% 徹底清除) ──
+            if (!localStorage.getItem('v10_clean_reset_done_v3')) {
+                Object.keys(localStorage).filter(k => k.startsWith('v10_')).forEach(k => localStorage.removeItem(k));
+                localStorage.setItem('v10_clean_reset_done_v3', 'true');
+            }
+
+            // ── localStorage 同步讀取工具 ──
+            const _lsGet = (key, def) => {
+                try { const v = localStorage.getItem(key); return v !== null ? JSON.parse(v) : def; } catch { return def; }
+            };
+
+            // ── State Declarations (Lazy Initializer：首次渲染前同步從 localStorage 讀取) ──
+            const [academicYears, setAcademicYears] = useState(() => _lsGet('v10_years', DEFAULT_YEARS));
+            const [currentYear, setCurrentYear] = useState(() => _lsGet('v10_current_year', DEFAULT_CURRENT_YEAR));
+            const [records, setRecords] = useState(() => _lsGet('v10_records', []));
+            const [classes, setClasses] = useState(() => _lsGet('v10_classes', []));
+            const [exams, setExams] = useState(() => _lsGet('v10_exams', {}));
+            const [holidays, setHolidays] = useState(() => _lsGet('v10_holidays', INITIAL_HOLIDAYS));
+            const [customHolidays, setCustomHolidays] = useState(() => _lsGet('v10_custom_holidays', []));
+            const [makeupDays, setMakeupDays] = useState(() => _lsGet('v10_makeup_days', {}));
+            const [tags, setTags] = useState(() => _lsGet('v10_tags', ['複習', '實驗', '影片', '學習單', '分組', '口試']));
 
             const [viewMode, setViewMode] = useState('list');
-            
             const [showSettings, setShowSettings] = useState(false);
             const [settingTab, setSettingTab] = useState('class');
             const [filter, setFilter] = useState('');
-
             const [form, setForm] = useState({ className: '', subject: '', date: formatDate(new Date()), progress: '', homework: '', quiz: false, tags: [], note: '' });
-            const [tags, setTags] = useState(['複習', '實驗', '影片', '學習單', '分組', '口試']);
             const [expandedClasses, setExpandedClasses] = useState({});
             const [calendarDate, setCalendarDate] = useState(new Date());
-
-            // Cloud Offline Sync Queue
-            const [cloudSettings, setCloudSettings] = useState({ gasUrl: '' });
-            const [offlineQueue, setOfflineQueue] = useState([]);
             const [isOnline, setIsOnline] = useState(navigator.onLine);
 
             // Undo Delete & Edit
@@ -303,6 +309,9 @@
             const dragItem = useRef(null);
             const dragOverItem = useRef(null);
 
+            // 資料已完成初始化旗標 (防止首次渲染覆蓋)
+            const [isInitialized, setIsInitialized] = useState(false);
+
             // --- Custom Modal Helper Functions ---
             const showAlert = (title, message) => {
                 setModalConfig({ type: 'alert', title, message });
@@ -316,175 +325,28 @@
                 setModalConfig({ type: 'prompt', title, placeholder, value: '', onPromptSubmit: onSubmit });
             };
 
-            // --- Initialization & PWA Service Worker ---
+            // --- Initialization ---
             useEffect(() => {
-                if ('serviceWorker' in navigator) {
-                    navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW registration skipped', err));
-                }
-
                 const handleOnline = () => setIsOnline(true);
                 const handleOffline = () => setIsOnline(false);
                 window.addEventListener('online', handleOnline);
                 window.addEventListener('offline', handleOffline);
 
-                const loadData = async () => {
-                    const load = (k, def) => { try { return JSON.parse(localStorage.getItem(k)) || def; } catch { return def; } };
-                    
-                    let idbRecords = await loadFromIDB('records');
-                    setRecords(idbRecords || load('v10_records', []));
-
-                    let idbClasses = await loadFromIDB('classes');
-                    setClasses(idbClasses || load('v10_classes', []));
-
-                    setAcademicYears(load('v10_years', DEFAULT_YEARS));
-                    setCurrentYear(localStorage.getItem('v10_current_year') || DEFAULT_CURRENT_YEAR);
-                    setExams(load('v10_exams', {}));
-                    setHolidays(load('v10_holidays', INITIAL_HOLIDAYS));
-                    setCustomHolidays(load('v10_custom_holidays', []));
-                    setMakeupDays(load('v10_makeup_days', {}));
-                    setTags(load('v10_tags', ['複習', '實驗', '影片', '學習單', '分組', '口試']));
-                    setCloudSettings(load('v10_cloud_settings', { gasUrl: '' }));
-                    setOfflineQueue(load('v10_offline_queue', []));
-                };
-
-                loadData();
-
-                // ══════════════════════════════════════════════════════════════════
-                // 5. Firebase Realtime Database 免費即時推播與同步模組 (方案 B)
-                // ══════════════════════════════════════════════════════════════════
-                const defaultDbUrl = 'https://classtracker-v10-default-rtdb.firebaseio.com';
-                const firebaseConfig = JSON.parse(localStorage.getItem('v10_firebase_settings') || `{"dbUrl":"${defaultDbUrl}"}`);
-                const currentDbUrl = (firebaseConfig.dbUrl || defaultDbUrl).replace(/\/+$/, '');
-
-                let eventSource = null;
-
-                // 開頁與背景即時監聽 (EventSource Server-Sent Events)
-                const startFirebaseListener = () => {
-                    if (!currentDbUrl || !window.EventSource) return;
-                    try {
-                        // 關閉舊連線
-                        if (eventSource) eventSource.close();
-
-                        // 建立即時推播監聽
-                        eventSource = new EventSource(`${currentDbUrl}/classtracker.json`);
-                        
-                        eventSource.onmessage = (e) => {
-                            try {
-                                const payload = JSON.parse(e.data);
-                                if (!payload || !payload.data) return;
-                                const data = payload.data;
-                                
-                                if (data.records) {
-                                    const recordList = Array.isArray(data.records) 
-                                        ? data.records.filter(Boolean) 
-                                        : Object.values(data.records);
-                                    
-                                    setRecords(prev => {
-                                        const localMap = new Map(prev.map(r => [r.id, r]));
-                                        let updated = false;
-                                        recordList.forEach(r => {
-                                            if (r && r.id && (!localMap.has(r.id) || JSON.stringify(localMap.get(r.id)) !== JSON.stringify(r))) {
-                                                localMap.set(r.id, r);
-                                                updated = true;
-                                            }
-                                        });
-                                        return updated 
-                                            ? Array.from(localMap.values()).sort((a, b) => new Date(b.date || b.timestamp) - new Date(a.date || a.timestamp))
-                                            : prev;
-                                    });
-                                }
-
-                                if (data.classes) {
-                                    const classList = Array.isArray(data.classes)
-                                        ? data.classes.filter(Boolean)
-                                        : Object.values(data.classes);
-
-                                    setClasses(prev => {
-                                        const localKeys = new Set(prev.map(c => c.name + '_' + c.year));
-                                        const newClasses = classList.filter(c => c && !localKeys.has(c.name + '_' + c.year));
-                                        return newClasses.length > 0 ? [...prev, ...newClasses] : prev;
-                                    });
-                                }
-                            } catch (err) { console.warn('Firebase SSE parse error', err); }
-                        };
-
-                        eventSource.onerror = () => {
-                            // 若連線中斷則手動回退至 REST 抓取
-                            fetchFirebaseRest();
-                        };
-                    } catch (err) {
-                        fetchFirebaseRest();
-                    }
-                };
-
-                // REST 備用抓取
-                const fetchFirebaseRest = async () => {
-                    if (!currentDbUrl) return;
-                    try {
-                        const res = await fetch(`${currentDbUrl}/classtracker.json`);
-                        if (!res.ok) return;
-                        const data = await res.json();
-                        if (data) {
-                            if (data.records) {
-                                const list = Array.isArray(data.records) ? data.records.filter(Boolean) : Object.values(data.records);
-                                setRecords(prev => {
-                                    const map = new Map(prev.map(r => [r.id, r]));
-                                    list.forEach(r => { if (r && r.id) map.set(r.id, r); });
-                                    return Array.from(map.values()).sort((a, b) => new Date(b.date || b.timestamp) - new Date(a.date || a.timestamp));
-                                });
-                            }
-                            if (data.classes) {
-                                const list = Array.isArray(data.classes) ? data.classes.filter(Boolean) : Object.values(data.classes);
-                                setClasses(prev => {
-                                    const keys = new Set(prev.map(c => c.name + '_' + c.year));
-                                    const added = list.filter(c => c && !keys.has(c.name + '_' + c.year));
-                                    return added.length > 0 ? [...prev, ...added] : prev;
-                                });
-                            }
-                        }
-                    } catch (e) { console.warn('Firebase REST fetch skipped', e); }
-                };
-
-                // 新增紀錄即時寫入 Firebase
-                window.syncRecordToFirebase = async (record) => {
-                    if (!currentDbUrl) return;
-                    try {
-                        await fetch(`${currentDbUrl}/classtracker/records/${record.id}.json`, {
-                            method: 'PUT',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(record)
-                        });
-                    } catch (e) { console.warn('Firebase write skipped', e); }
-                };
-
-                window.syncClassesToFirebase = async (classesList) => {
-                    if (!currentDbUrl) return;
-                    try {
-                        await fetch(`${currentDbUrl}/classtracker/classes.json`, {
-                            method: 'PUT',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(classesList)
-                        });
-                    } catch (e) { console.warn('Firebase class write skipped', e); }
-                };
-
-                startFirebaseListener();
+                // lazy initializer 已在 useState 中同步完成讀取，直接標記初始化完成
+                setIsInitialized(true);
 
                 // 自動聯網查詢並更新行政院國定放假日期 (TaiwanCalendar API)
                 const autoFetchHolidays = async () => {
                     const y = new Date().getFullYear();
-                    const yearsToFetch = [y - 1, y, y + 1];
                     try {
-                        const results = await Promise.all(
-                            yearsToFetch.map(async (year) => {
-                                try {
-                                    const res = await fetch(`https://cdn.jsdelivr.net/gh/ruyut/TaiwanCalendar/data/${year}.json`);
-                                    if (!res.ok) return [];
-                                    const data = await res.json();
-                                    return data.filter(x => x.isHoliday).map(x => x.date.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'));
-                                } catch { return []; }
-                            })
-                        );
+                        const results = await Promise.all([y - 1, y, y + 1].map(async (year) => {
+                            try {
+                                const res = await fetch(`https://cdn.jsdelivr.net/gh/ruyut/TaiwanCalendar/data/${year}.json`);
+                                if (!res.ok) return [];
+                                const data = await res.json();
+                                return data.filter(x => x.isHoliday).map(x => x.date.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'));
+                            } catch { return []; }
+                        }));
                         const fetched = results.flat();
                         if (fetched.length > 0) {
                             setHolidays(prev => [...new Set([...prev, ...fetched])].sort());
@@ -494,74 +356,33 @@
                 autoFetchHolidays();
 
                 return () => {
-                    if (pollingTimer) clearInterval(pollingTimer);
                     window.removeEventListener('online', handleOnline);
                     window.removeEventListener('offline', handleOffline);
                 };
             }, []);
 
-            // Consolidated LocalStorage & IndexedDB Data Persistence
-            const persistentData = useMemo(() => ({
-                records, classes, exams, holidays, customHolidays, makeupDays,
-                years: academicYears, tags, currentYear, cloudSettings, offlineQueue
-            }), [records, classes, exams, holidays, customHolidays, makeupDays, academicYears, tags, currentYear, cloudSettings, offlineQueue]);
-
+            // ── 自動儲存：任何資料變動後直接寫入 localStorage (含 isInitialized 守衛) ──
             useEffect(() => {
-                Object.entries(persistentData).forEach(([key, value]) => {
-                    const storageKey = key === 'years' ? 'v10_years' :
-                        key === 'currentYear' ? 'v10_current_year' :
-                        key === 'cloudSettings' ? 'v10_cloud_settings' :
-                        key === 'offlineQueue' ? 'v10_offline_queue' : `v10_${key}`;
-                    
-                    localStorage.setItem(storageKey, typeof value === 'string' ? value : JSON.stringify(value));
-                });
-
+                if (!isInitialized) return;
+                try { localStorage.setItem('v10_records', JSON.stringify(records)); } catch(e) {}
                 saveToIDB('records', records);
+            }, [records, isInitialized]);
+            useEffect(() => {
+                if (!isInitialized) return;
+                try { localStorage.setItem('v10_classes', JSON.stringify(classes)); } catch(e) {}
                 saveToIDB('classes', classes);
-            }, [persistentData]);
+            }, [classes, isInitialized]);
+            useEffect(() => { if (!isInitialized) return; try { localStorage.setItem('v10_years', JSON.stringify(academicYears)); } catch(e) {} }, [academicYears, isInitialized]);
+            useEffect(() => { if (!isInitialized) return; try { localStorage.setItem('v10_current_year', JSON.stringify(currentYear)); } catch(e) {} }, [currentYear, isInitialized]);
+            useEffect(() => { if (!isInitialized) return; try { localStorage.setItem('v10_exams', JSON.stringify(exams)); } catch(e) {} }, [exams, isInitialized]);
+            useEffect(() => { if (!isInitialized) return; try { localStorage.setItem('v10_holidays', JSON.stringify(holidays)); } catch(e) {} }, [holidays, isInitialized]);
+            useEffect(() => { if (!isInitialized) return; try { localStorage.setItem('v10_custom_holidays', JSON.stringify(customHolidays)); } catch(e) {} }, [customHolidays, isInitialized]);
+            useEffect(() => { if (!isInitialized) return; try { localStorage.setItem('v10_makeup_days', JSON.stringify(makeupDays)); } catch(e) {} }, [makeupDays, isInitialized]);
+            useEffect(() => { if (!isInitialized) return; try { localStorage.setItem('v10_tags', JSON.stringify(tags)); } catch(e) {} }, [tags, isInitialized]);
 
             
 
-            // --- Offline Cloud Queue Processing ---
-            useEffect(() => {
-                if (isOnline && offlineQueue.length > 0 && cloudSettings.gasUrl) {
-                    const processQueue = async () => {
-                        const queueToProcess = [...offlineQueue];
-                        setOfflineQueue([]);
-                        for (const item of queueToProcess) {
-                            try {
-                                await fetch(cloudSettings.gasUrl, {
-                                    method: 'POST',
-                                    mode: 'no-cors',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ action: 'add_record', record: item })
-                                });
-                            } catch (e) {
-                                console.warn('Cloud sync queue retry failed', e);
-                            }
-                        }
-                    };
-                    processQueue();
-                }
-            }, [isOnline, offlineQueue, cloudSettings]);
 
-            const uploadRecordToCloud = async (record) => {
-                if (!cloudSettings.gasUrl) return;
-                if (!navigator.onLine) {
-                    setOfflineQueue(prev => [...prev, record]);
-                    return;
-                }
-                try {
-                    await fetch(cloudSettings.gasUrl, {
-                        method: 'POST',
-                        mode: 'no-cors',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ action: 'add_record', record })
-                    });
-                } catch (e) {
-                    setOfflineQueue(prev => [...prev, record]);
-                }
-            };
 
             const currentExams = useMemo(() => exams[currentYear] || {
                 semesterStart: '', semesterEnd: '',
@@ -677,8 +498,7 @@
                 if (!form.className || !form.subject || !form.progress) return;
                 const newRecord = { id: Date.now(), ...form, year: currentYear, timestamp: new Date().toISOString() };
                 setRecords([newRecord, ...records]);
-                uploadRecordToCloud(newRecord);
-                if (window.syncRecordToFirebase) window.syncRecordToFirebase(newRecord);
+
                 setForm({ ...form, progress: '', homework: '', quiz: false, tags: [], note: '' });
                 setExpandedClasses(p => ({ ...p, [form.className]: true }));
             };
@@ -838,7 +658,7 @@
                                     <div className="flex items-center gap-2 mt-1">
                                         <span className="text-[10px] font-semibold text-emerald-200 tracking-wider">V10 ULTRA</span>
                                         {!isOnline && <span className="bg-amber-600/80 text-white text-[9px] px-1.5 py-0.5 rounded font-bold">離線模式</span>}
-                                        {offlineQueue.length > 0 && <span className="bg-blue-600/80 text-white text-[9px] px-1.5 py-0.5 rounded font-bold">待同步 ({offlineQueue.length})</span>}
+
                                     </div>
                                 </div>
                             </div>
@@ -1392,6 +1212,26 @@
                                             <span>載入並還原 JSON 備份檔</span>
                                             <input type="file" onChange={handleFileRestore} className="hidden" accept=".json" />
                                         </label>
+
+                                        <div className="pt-3 border-t border-gray-200">
+                                            <label className="block text-[11px] font-bold text-red-500 mb-1.5">重置與清空</label>
+                                            <MujiButton onClick={() => {
+                                                showConfirm('重置並清空所有資料', '確定要清空所有紀錄與班級設定，還原至最乾淨初始狀態嗎？', () => {
+                                                    Object.keys(localStorage).filter(k => k.startsWith('v10_')).forEach(k => localStorage.removeItem(k));
+                                                    setRecords([]);
+                                                    setClasses([
+                                                        { name: '高一甲', days: [1, 3], year: '114-1' },
+                                                        { name: '高二乙', days: [2, 4], year: '114-1' }
+                                                    ]);
+                                                    setAcademicYears(DEFAULT_YEARS);
+                                                    setCurrentYear(DEFAULT_CURRENT_YEAR);
+                                                    setExams({});
+                                                    setCustomHolidays([]);
+                                                    setMakeupDays({});
+                                                    showAlert('已重置', '資料已成功清空，系統已還原至最乾淨版本！');
+                                                });
+                                            }} label="清空所有資料 (還原至最乾淨版本)" iconName="Trash2" variant="danger" className="w-full text-red-600 border-red-200 bg-red-50 hover:bg-red-100" size="sm" />
+                                        </div>
                                     </div>
                                 )}
                             </div>
