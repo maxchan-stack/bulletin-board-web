@@ -253,10 +253,6 @@
         function ClassTrackerV10() {
             const DEFAULT_YEARS = ['113-1', '113-2', '114-1', '114-2'];
             const DEFAULT_CURRENT_YEAR = '114-1';
-            const INITIAL_CLASSES = [
-                { name: '高一甲', days: [1, 3], year: '114-1' },
-                { name: '高二乙', days: [2, 4], year: '114-1' }
-            ];
             const INITIAL_HOLIDAYS = ['2025-01-27', '2025-01-28', '2025-01-29', '2025-01-30', '2025-01-31', '2025-02-28', '2025-04-03', '2025-04-04', '2025-05-30', '2025-10-10', '2026-01-01'];
 
             const formatDate = (d) => {
@@ -266,30 +262,32 @@
             const getDayBefore = (s) => { if (!s) return null; const d = new Date(s); d.setDate(d.getDate() - 1); return formatDate(d); };
             const weekDays = ['一', '二', '三', '四', '五', '六', '日'];
 
-            // --- State Declarations ---
-            const [academicYears, setAcademicYears] = useState(DEFAULT_YEARS);
-            const [currentYear, setCurrentYear] = useState(DEFAULT_CURRENT_YEAR);
-            const [records, setRecords] = useState([]);
-            const [classes, setClasses] = useState([]);
-            const [exams, setExams] = useState({});
-            const [holidays, setHolidays] = useState(INITIAL_HOLIDAYS);
-            const [customHolidays, setCustomHolidays] = useState([]);
-            const [makeupDays, setMakeupDays] = useState({});
+            // ── 同步讀寫 localStorage 工具 ──
+            const lsGet = (key, def) => {
+                try { const v = localStorage.getItem(key); return v !== null ? JSON.parse(v) : def; } catch { return def; }
+            };
+            const lsSave = (key, val) => {
+                try { localStorage.setItem(key, JSON.stringify(val)); } catch(e) {}
+            };
+
+            // --- State Declarations (Lazy Initializer: 首次渲染前同步從 localStorage 讀取) ---
+            const [academicYears, setAcademicYears] = useState(() => lsGet('v10_years', DEFAULT_YEARS));
+            const [currentYear, setCurrentYear] = useState(() => lsGet('v10_current_year', DEFAULT_CURRENT_YEAR));
+            const [records, setRecords] = useState(() => lsGet('v10_records', []));
+            const [classes, setClasses] = useState(() => lsGet('v10_classes', []));
+            const [exams, setExams] = useState(() => lsGet('v10_exams', {}));
+            const [holidays, setHolidays] = useState(() => lsGet('v10_holidays', INITIAL_HOLIDAYS));
+            const [customHolidays, setCustomHolidays] = useState(() => lsGet('v10_custom_holidays', []));
+            const [makeupDays, setMakeupDays] = useState(() => lsGet('v10_makeup_days', {}));
+            const [tags, setTags] = useState(() => lsGet('v10_tags', ['複習', '實驗', '影片', '學習單', '分組', '口試']));
 
             const [viewMode, setViewMode] = useState('list');
-            
             const [showSettings, setShowSettings] = useState(false);
             const [settingTab, setSettingTab] = useState('class');
             const [filter, setFilter] = useState('');
-
             const [form, setForm] = useState({ className: '', subject: '', date: formatDate(new Date()), progress: '', homework: '', quiz: false, tags: [], note: '' });
-            const [tags, setTags] = useState(['複習', '實驗', '影片', '學習單', '分組', '口試']);
             const [expandedClasses, setExpandedClasses] = useState({});
             const [calendarDate, setCalendarDate] = useState(new Date());
-
-            // Cloud Offline Sync Queue
-            const [cloudSettings, setCloudSettings] = useState({ gasUrl: '' });
-            const [offlineQueue, setOfflineQueue] = useState([]);
             const [isOnline, setIsOnline] = useState(navigator.onLine);
 
             // Undo Delete & Edit
@@ -305,15 +303,16 @@
             const dragItem = useRef(null);
             const dragOverItem = useRef(null);
 
-            const [isInitialized, setIsInitialized] = useState(false);
-
-            // ── 簡單可靠儲存工具 (直接讀寫 localStorage) ──
-            const ls_save = (key, val) => {
-                try { localStorage.setItem(key, typeof val === 'string' ? val : JSON.stringify(val)); } catch(e) {}
-            };
-            const ls_load = (key, def) => {
-                try { const v = localStorage.getItem(key); return v !== null ? JSON.parse(v) : def; } catch { return def; }
-            };
+            // --- 自動儲存：任何資料變動時直接同步寫入 localStorage ---
+            useEffect(() => { lsSave('v10_records', records); }, [records]);
+            useEffect(() => { lsSave('v10_classes', classes); }, [classes]);
+            useEffect(() => { lsSave('v10_years', academicYears); }, [academicYears]);
+            useEffect(() => { lsSave('v10_current_year', currentYear); }, [currentYear]);
+            useEffect(() => { lsSave('v10_exams', exams); }, [exams]);
+            useEffect(() => { lsSave('v10_holidays', holidays); }, [holidays]);
+            useEffect(() => { lsSave('v10_custom_holidays', customHolidays); }, [customHolidays]);
+            useEffect(() => { lsSave('v10_makeup_days', makeupDays); }, [makeupDays]);
+            useEffect(() => { lsSave('v10_tags', tags); }, [tags]);
 
             // --- Custom Modal Helper Functions ---
             const showAlert = (title, message) => {
@@ -334,21 +333,6 @@
                 const handleOffline = () => setIsOnline(false);
                 window.addEventListener('online', handleOnline);
                 window.addEventListener('offline', handleOffline);
-
-                // 讀取所有儲存資料
-                setRecords(ls_load('v10_records', []));
-                setClasses(ls_load('v10_classes', []));
-                setAcademicYears(ls_load('v10_years', DEFAULT_YEARS));
-                setCurrentYear(ls_load('v10_current_year', DEFAULT_CURRENT_YEAR));
-                setExams(ls_load('v10_exams', {}));
-                setHolidays(ls_load('v10_holidays', INITIAL_HOLIDAYS));
-                setCustomHolidays(ls_load('v10_custom_holidays', []));
-                setMakeupDays(ls_load('v10_makeup_days', {}));
-                setTags(ls_load('v10_tags', ['複習', '實驗', '影片', '學習單', '分組', '口試']));
-                setOfflineQueue([]);
-
-                // 開頁載入後確認完成，啟動自動儲存
-                setTimeout(() => setIsInitialized(true), 100);
 
                 // 自動聯網查詢並更新行政院國定放假日期 (TaiwanCalendar API)
                 const autoFetchHolidays = async () => {
@@ -375,63 +359,6 @@
                     window.removeEventListener('offline', handleOffline);
                 };
             }, []);
-
-            // ── 任何狀態變動後，直接同步儲存至 localStorage ──
-            useEffect(() => {
-                if (!isInitialized) return;
-                ls_save('v10_records', records);
-                ls_save('v10_classes', classes);
-                ls_save('v10_years', academicYears);
-                ls_save('v10_current_year', currentYear);
-                ls_save('v10_exams', exams);
-                ls_save('v10_holidays', holidays);
-                ls_save('v10_custom_holidays', customHolidays);
-                ls_save('v10_makeup_days', makeupDays);
-                ls_save('v10_tags', tags);
-            }, [isInitialized, records, classes, academicYears, currentYear, exams, holidays, customHolidays, makeupDays, tags]);
-
-            
-
-            // --- Offline Cloud Queue Processing ---
-            useEffect(() => {
-                if (isOnline && offlineQueue.length > 0 && cloudSettings.gasUrl) {
-                    const processQueue = async () => {
-                        const queueToProcess = [...offlineQueue];
-                        setOfflineQueue([]);
-                        for (const item of queueToProcess) {
-                            try {
-                                await fetch(cloudSettings.gasUrl, {
-                                    method: 'POST',
-                                    mode: 'no-cors',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ action: 'add_record', record: item })
-                                });
-                            } catch (e) {
-                                console.warn('Cloud sync queue retry failed', e);
-                            }
-                        }
-                    };
-                    processQueue();
-                }
-            }, [isOnline, offlineQueue, cloudSettings]);
-
-            const uploadRecordToCloud = async (record) => {
-                if (!cloudSettings.gasUrl) return;
-                if (!navigator.onLine) {
-                    setOfflineQueue(prev => [...prev, record]);
-                    return;
-                }
-                try {
-                    await fetch(cloudSettings.gasUrl, {
-                        method: 'POST',
-                        mode: 'no-cors',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ action: 'add_record', record })
-                    });
-                } catch (e) {
-                    setOfflineQueue(prev => [...prev, record]);
-                }
-            };
 
             const currentExams = useMemo(() => exams[currentYear] || {
                 semesterStart: '', semesterEnd: '',
